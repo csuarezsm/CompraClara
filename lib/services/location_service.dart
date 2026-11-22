@@ -4,7 +4,7 @@ import 'package:geolocator/geolocator.dart';
 class LocationService {
   static Future<({double lat, double lng})?> current() async {
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) return _lastKnown();
+      if (!await Geolocator.isLocationServiceEnabled()) return await _lastKnown();
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
@@ -20,7 +20,7 @@ class LocationService {
       );
       return (lat: p.latitude, lng: p.longitude);
     } catch (_) {
-      return _lastKnown();
+      return await _lastKnown();
     }
   }
 
