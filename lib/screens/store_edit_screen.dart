@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../data/models.dart';
 import '../data/repository.dart';
 import '../main.dart' show repo;
+import '../services/location_service.dart';
+import '../util.dart';
 import '../widgets.dart';
 
 /// Ficha del supermercado: secciones (orden del recorrido) y artículos por sección.
@@ -25,6 +27,11 @@ class StoreEditScreen extends StatelessWidget {
             appBar: AppBar(
               title: Text(store.name),
               actions: [
+                IconButton(
+                  tooltip: 'Ubicación',
+                  icon: Icon(store.hasLocation ? Icons.location_on : Icons.location_off_outlined),
+                  onPressed: () => showStoreLocationSheet(context, store),
+                ),
                 IconButton(
                   tooltip: 'Renombrar',
                   icon: const Icon(Icons.edit_outlined),
@@ -271,4 +278,75 @@ class _ProductsTabState extends State<_ProductsTab> {
       ],
     );
   }
+}
+
+/// Ubicación del supermercado: necesaria para compararlo por distancia.
+Future<void> showStoreLocationSheet(BuildContext context, Store store) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Ubicación de ${store.name}', style: Theme.of(ctx).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(
+              store.hasLocation
+                  ? 'Guardada: ${store.lat!.toStringAsFixed(5)}, ${store.lng!.toStringAsFixed(5)}'
+                  : 'Sin ubicación: esta tienda no entra en la comparación por distancia.',
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.my_location),
+              title: const Text('Usar mi ubicación actual'),
+              subtitle: const Text('Hazlo estando dentro o en la puerta de la tienda'),
+              onTap: () async {
+                final pos = await LocationService.current();
+                if (!ctx.mounted) return;
+                if (pos == null) {
+                  snack(ctx, 'No se pudo obtener la ubicación. Activa el GPS y da permiso a la app.');
+                  return;
+                }
+                await repo.setStoreLocation(store.id, pos.lat, pos.lng);
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.edit_location_alt_outlined),
+              title: const Text('Escribir o pegar coordenadas'),
+              subtitle: const Text('Desde Google Maps: 28.9636, -13.5477'),
+              onTap: () async {
+                final t = await promptText(ctx,
+                    title: 'Coordenadas', hint: '28.9636, -13.5477', okLabel: 'Guardar');
+                if (t == null) return;
+                final c = parseCoords(t);
+                if (c == null) {
+                  if (ctx.mounted) snack(ctx, 'Formato no válido. Ejemplo: 28.9636, -13.5477');
+                  return;
+                }
+                await repo.setStoreLocation(store.id, c.lat, c.lng);
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+            ),
+            if (store.hasLocation)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.location_off_outlined),
+                title: const Text('Quitar ubicación'),
+                onTap: () async {
+                  await repo.setStoreLocation(store.id, null, null);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

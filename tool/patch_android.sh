@@ -8,7 +8,7 @@ MANIFEST="android/app/src/main/AndroidManifest.xml"
 sed -i 's/android:label="[^"]*"/android:label="CompraClara"/' "$MANIFEST"
 
 if ! grep -q 'android.permission.CAMERA' "$MANIFEST"; then
-  sed -i 's#<application#<uses-permission android:name="android.permission.CAMERA"/>\n    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-feature android:name="android.hardware.camera" android:required="false"/>\n    <application#' "$MANIFEST"
+  sed -i 's#<application#<uses-permission android:name="android.permission.CAMERA"/>\n    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-feature android:name="android.hardware.camera" android:required="false"/>\n    <application#' "$MANIFEST"
 fi
 
 echo "Manifest parcheado:"

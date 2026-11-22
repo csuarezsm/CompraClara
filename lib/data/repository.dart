@@ -61,9 +61,49 @@ class Repo extends ChangeNotifier {
     _changed();
   }
 
+  Future<void> setStoreLocation(String id, double? lat, double? lng) async {
+    await db.update('stores', {'lat': lat, 'lng': lng}, where: 'id = ?', whereArgs: [id]);
+    _changed();
+  }
+
   Future<void> deleteStore(String id) async {
     await db.delete('stores', where: 'id = ?', whereArgs: [id]);
     _changed();
+  }
+
+  // ----------------------------------------------------------------- Ajustes
+
+  Future<String?> getSetting(String key) async {
+    final r = await db.query('settings', where: 'key = ?', whereArgs: [key]);
+    return r.isEmpty ? null : r.first['value'] as String?;
+  }
+
+  Future<void> setSetting(String key, String? value) async {
+    if (value == null) {
+      await db.delete('settings', where: 'key = ?', whereArgs: [key]);
+    } else {
+      await db.insert('settings', {'key': key, 'value': value},
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    _changed();
+  }
+
+  /// Distancia máxima (km) para comparar supermercados. Por defecto 20 km.
+  Future<double> radiusKm() async => double.tryParse(await getSetting('radius_km') ?? '') ?? 20;
+
+  Future<void> setRadiusKm(double km) => setSetting('radius_km', km.toStringAsFixed(0));
+
+  /// Zona habitual: punto de referencia si no hay GPS.
+  Future<({double lat, double lng})?> homeZone() async {
+    final lat = double.tryParse(await getSetting('zone_lat') ?? '');
+    final lng = double.tryParse(await getSetting('zone_lng') ?? '');
+    if (lat == null || lng == null) return null;
+    return (lat: lat, lng: lng);
+  }
+
+  Future<void> setHomeZone(double? lat, double? lng) async {
+    await setSetting('zone_lat', lat?.toString());
+    await setSetting('zone_lng', lng?.toString());
   }
 
   // ------------------------------------------------------ Secciones de tienda
@@ -546,7 +586,7 @@ class Repo extends ChangeNotifier {
 
   /// Comparativa de la lista entre todas las tiendas (menor coste primero,
   /// priorizando las que tienen más artículos con precio).
-  Future<List<StoreEstimate>> compareStores(String listId) async {
+  Future<List<StoreEstimate>> compareStores(String listId, {double? lat, double? lng}) async {
     final items = (await this.items(listId)).where((i) => i.status == statusPending).toList();
     final out = <StoreEstimate>[];
     for (final s in await stores()) {
@@ -565,7 +605,11 @@ class Repo extends ChangeNotifier {
             size: i.size,
             section: i.section,
           )).toList(), prices);
-      out.add(StoreEstimate(store: s, total: e.total, priced: e.priced, count: e.count));
+      final dist = (lat != null && lng != null && s.hasLocation)
+          ? distanceKm(lat, lng, s.lat!, s.lng!)
+          : null;
+      out.add(StoreEstimate(
+          store: s, total: e.total, priced: e.priced, count: e.count, distanceKm: dist));
     }
     out.sort((a, b) {
       final cov = b.priced.compareTo(a.priced);

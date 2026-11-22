@@ -35,3 +35,33 @@ String dateEs(String iso) {
   if (p.length != 3) return iso;
   return '${p[2]}/${p[1]}/${p[0]}';
 }
+
+/// Distancia en km entre dos puntos (fórmula del haverseno).
+double distanceKm(double lat1, double lng1, double lat2, double lng2) {
+  const r = 6371.0;
+  double rad(double d) => d * pi / 180;
+  final dLat = rad(lat2 - lat1);
+  final dLng = rad(lng2 - lng1);
+  final a = sin(dLat / 2) * sin(dLat / 2) +
+      cos(rad(lat1)) * cos(rad(lat2)) * sin(dLng / 2) * sin(dLng / 2);
+  return r * 2 * atan2(sqrt(a), sqrt(1 - a));
+}
+
+String kmText(double km) {
+  if (km < 1) return '${(km * 1000).round()} m';
+  if (km < 10) return '${km.toStringAsFixed(1).replaceAll('.', ',')} km';
+  return '${km.round()} km';
+}
+
+/// Lee "28.9636, -13.5477" (formato de Google Maps).
+({double lat, double lng})? parseCoords(String text) {
+  final nums = RegExp(r'-?\d+(?:\.\d+)?')
+      .allMatches(text)
+      .map((m) => double.tryParse(m.group(0)!))
+      .whereType<double>()
+      .toList();
+  if (nums.length < 2) return null;
+  final lat = nums[0], lng = nums[1];
+  if (lat.abs() > 90 || lng.abs() > 180) return null;
+  return (lat: lat, lng: lng);
+}

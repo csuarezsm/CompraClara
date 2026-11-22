@@ -5,7 +5,9 @@ import '../data/repository.dart';
 import '../main.dart' show repo;
 import '../util.dart';
 import '../widgets.dart';
+import '../services/location_service.dart';
 import 'add_item_screen.dart';
+import 'settings_screen.dart';
 import 'shop_screen.dart';
 
 class _DetailData {
@@ -61,11 +63,38 @@ class ListDetailScreen extends StatelessWidget {
   }
 
   Future<void> _compare(BuildContext context) async {
-    final list = await repo.compareStores(listId);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    final radius = await repo.radiusKm();
+    var ref = await LocationService.current();
+    var refLabel = 'de tu ubicación';
+    if (ref == null) {
+      ref = await repo.homeZone();
+      refLabel = 'de tu zona habitual';
+    }
+    final all = await repo.compareStores(listId, lat: ref?.lat, lng: ref?.lng);
     if (!context.mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+
+    final List<StoreEstimate> ranked;
+    final List<StoreEstimate> noLocation;
+    var outOfRange = 0;
+    if (ref == null) {
+      ranked = all;
+      noLocation = [];
+    } else {
+      ranked = all.where((e) => e.distanceKm != null && e.distanceKm! <= radius).toList();
+      noLocation = all.where((e) => e.distanceKm == null).toList();
+      outOfRange = all.where((e) => e.distanceKm != null && e.distanceKm! > radius).length;
+    }
+
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
         child: ListView(
           shrinkWrap: true,
@@ -74,28 +103,56 @@ class ListDetailScreen extends StatelessWidget {
             Text('Comparar supermercados', style: Theme.of(ctx).textTheme.titleLarge),
             const SizedBox(height: 4),
             Text(
-              'Coste de lo pendiente con el último precio guardado de cada artículo.',
+              ref == null
+                  ? 'Sin ubicación ni zona habitual: se muestran todas las tiendas. '
+                      'Activa el GPS o fija tu zona para filtrar por distancia.'
+                  : 'Tiendas a menos de ${radius.round()} km $refLabel, con el último precio guardado de lo pendiente.',
               style: Theme.of(ctx).textTheme.bodySmall,
             ),
-            const SizedBox(height: 8),
-            if (list.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('Aún no hay supermercados. Añádelos en la pestaña «Súpers».'),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+              },
+              icon: const Icon(Icons.tune, size: 18),
+              label: const Text('Cambiar distancia'),
+            ),
+            if (ranked.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(all.isEmpty
+                    ? 'Aún no hay supermercados. Añádelos en la pestaña «Súpers».'
+                    : 'Ningún supermercado con ubicación dentro de ${radius.round()} km.'),
               ),
-            for (var i = 0; i < list.length; i++)
+            for (var i = 0; i < ranked.length; i++)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(child: Text('${i + 1}')),
-                title: Text(list[i].store.name),
-                subtitle: Text(
-                  list[i].priced == 0
-                      ? 'Sin precios guardados todavía'
-                      : '${list[i].priced} de ${list[i].count} artículos con precio',
-                ),
+                title: Text(ranked[i].store.name),
+                subtitle: Text([
+                  if (ranked[i].distanceKm != null) kmText(ranked[i].distanceKm!),
+                  ranked[i].priced == 0
+                      ? 'sin precios guardados'
+                      : '${ranked[i].priced} de ${ranked[i].count} con precio',
+                ].join(' · ')),
                 trailing: Text(
-                  list[i].priced == 0 ? '—' : money(list[i].total),
+                  ranked[i].priced == 0 ? '—' : money(ranked[i].total),
                   style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            if (outOfRange > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text('$outOfRange supermercado(s) fuera del radio no se comparan.',
+                    style: Theme.of(ctx).textTheme.bodySmall),
+              ),
+            if (noLocation.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Sin ubicación (no se comparan): ${noLocation.map((e) => e.store.name).join(', ')}. '
+                  'Guárdala en la ficha de cada supermercado.',
+                  style: Theme.of(ctx).textTheme.bodySmall,
                 ),
               ),
           ],

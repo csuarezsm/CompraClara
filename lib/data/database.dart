@@ -8,7 +8,7 @@ class AppDb {
     final path = p.join(await getDatabasesPath(), 'compraclara.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -18,8 +18,11 @@ class AppDb {
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             chain TEXT NOT NULL DEFAULT '',
+            lat REAL,
+            lng REAL,
             created_at INTEGER NOT NULL
           )''');
+        await db.execute('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)');
         await db.execute('''
           CREATE TABLE store_sections (
             id TEXT PRIMARY KEY,
@@ -94,6 +97,13 @@ class AppDb {
         await db.execute('CREATE INDEX idx_items_list ON list_items(list_id)');
         await db.execute('CREATE INDEX idx_prices_ps ON prices(product_id, store_id)');
         await db.execute('CREATE INDEX idx_sections_store ON store_sections(store_id)');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE stores ADD COLUMN lat REAL');
+          await db.execute('ALTER TABLE stores ADD COLUMN lng REAL');
+          await db.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)');
+        }
       },
     );
   }

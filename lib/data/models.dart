@@ -1,14 +1,20 @@
 class Store {
-  Store({required this.id, required this.name, this.chain = ''});
+  Store({required this.id, required this.name, this.chain = '', this.lat, this.lng});
 
   final String id;
   final String name;
   final String chain;
+  final double? lat;
+  final double? lng;
+
+  bool get hasLocation => lat != null && lng != null;
 
   factory Store.fromMap(Map<String, Object?> m) => Store(
         id: m['id'] as String,
         name: m['name'] as String,
         chain: (m['chain'] as String?) ?? '',
+        lat: (m['lat'] as num?)?.toDouble(),
+        lng: (m['lng'] as num?)?.toDouble(),
       );
 }
 
@@ -199,10 +205,14 @@ class StoreEstimate {
     required this.total,
     required this.priced,
     required this.count,
+    this.distanceKm,
   });
 
   final Store store;
   final double total;
   final int priced;
   final int count;
+
+  /// Distancia al punto de referencia (null si la tienda no tiene ubicación).
+  final double? distanceKm;
 }

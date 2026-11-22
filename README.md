@@ -9,7 +9,8 @@ Lista de la compra inteligente por secciones del supermercado. Producto de IT Ca
 - Supermercados con plantilla de 18 secciones, orden de recorrido editable y ubicación por artículo.
 - Modo compra por secciones: elegir sección, marcar como cogido, «no hay», pasar a la siguiente.
 - Escáner de código de barras (catálogo propio y Open Food Facts).
-- Precio manual por artículo e historial; estimación y comparativa de la lista entre tiendas.
+- Precio manual por artículo e historial; estimación y comparativa de la lista entre tiendas
+  dentro de un radio de km (GPS o zona habitual), para no mezclar islas o ciudades lejanas.
 - Funciona sin conexión.
 
 La especificación completa está en el Proyecto «App Lista De La Compra» (Claude).
