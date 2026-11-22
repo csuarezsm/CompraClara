@@ -1,0 +1,43 @@
+# CompraClara API — aislada del resto de proyectos del servidor:
+# nombre de proyecto, red, volumen y contenedores propios; solo escucha en 127.0.0.1:8095.
+name: compraclara
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: compraclara-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: compraclara
+      POSTGRES_USER: compraclara
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+    volumes:
+      - compraclara_pgdata:/var/lib/postgresql/data
+    networks: [compraclara_net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compraclara -d compraclara"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: compraclara-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://compraclara:${DB_PASSWORD}@db:5432/compraclara
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      CONTRIB_SECRET: ${CONTRIB_SECRET:?Falta CONTRIB_SECRET en .env}
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:${API_PORT:-8095}:3000"
+    networks: [compraclara_net]
+
+volumes:
+  compraclara_pgdata:
+
+networks:
+  compraclara_net:

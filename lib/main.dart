@@ -4,6 +4,7 @@ import 'package:quick_actions/quick_actions.dart';
 
 import 'data/repository.dart';
 import 'screens/catalog_screen.dart';
+import 'services/cloud_service.dart';
 import 'screens/lists_screen.dart';
 import 'screens/more_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -64,6 +65,7 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     _setupQuickActions();
+    CloudService.autoSync();
   }
 
   /// Accesos directos al mantener pulsado el icono de la app.

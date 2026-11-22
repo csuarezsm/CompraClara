@@ -5,6 +5,7 @@ import '../main.dart' show repo;
 import '../services/nearby.dart';
 import '../util.dart';
 import '../widgets.dart';
+import 'account_screen.dart';
 import 'label_capture.dart';
 import 'packs_screen.dart';
 import 'purchases_screen.dart';
@@ -59,6 +60,8 @@ class MoreScreen extends StatelessWidget {
           tile(Icons.verified_user_outlined, 'Garantías', 'Tickets guardados y plazos de garantía',
               const WarrantiesScreen()),
           const _Header('Aplicación'),
+          tile(Icons.cloud_outlined, 'Cuenta y nube', 'Copia en la nube y precios compartidos con otros usuarios',
+              const AccountScreen()),
           tile(Icons.settings_outlined, 'Ajustes', 'Distancia, presupuesto, alergias, copias y datos',
               const SettingsScreen()),
           const SizedBox(height: 24),

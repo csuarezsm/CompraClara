@@ -64,7 +64,7 @@ Future<void> loadDemoData(Repo repo) async {
   // Tiendas con ubicación
   final storeIds = <String>[];
   for (final s in _stores) {
-    final st = await repo.addStore(s.name);
+    final st = await repo.addStore(s.name, chain: 'ejemplo');
     await repo.setStoreLocation(st.id, s.lat, s.lng);
     storeIds.add(st.id);
   }

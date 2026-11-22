@@ -26,3 +26,12 @@ for f in android/app/build.gradle.kts android/app/build.gradle; do
 done
 sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' "$GRADLE"
 grep -n "minSdk" "$GRADLE" || true
+
+# ML Kit: el plugin referencia alfabetos (chino, japonés…) que no incluimos.
+cat > android/app/proguard-rules.pro <<'RULES'
+-dontwarn com.google.mlkit.vision.text.chinese.**
+-dontwarn com.google.mlkit.vision.text.devanagari.**
+-dontwarn com.google.mlkit.vision.text.japanese.**
+-dontwarn com.google.mlkit.vision.text.korean.**
+RULES
+echo "proguard-rules.pro creado"
