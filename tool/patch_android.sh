@@ -20,6 +20,9 @@ if ! grep -q 'android.speech.RecognitionService' "$MANIFEST"; then
 fi
 
 # minSdk 23 (requerido por algunos complementos: OCR, voz)
-GRADLE=$(ls android/app/build.gradle.kts android/app/build.gradle 2>/dev/null | head -1)
+GRADLE=""
+for f in android/app/build.gradle.kts android/app/build.gradle; do
+  if [ -f "$f" ]; then GRADLE="$f"; break; fi
+done
 sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' "$GRADLE"
 grep -n "minSdk" "$GRADLE" || true
