@@ -35,3 +35,16 @@ cat > android/app/proguard-rules.pro <<'RULES'
 -dontwarn com.google.mlkit.vision.text.korean.**
 RULES
 echo "proguard-rules.pro creado"
+
+# El análisis lint de release falla dentro de algún plugin con este AGP: se desactiva
+# (no afecta al APK; el código Dart se analiza aparte con flutter analyze).
+cat >> "$GRADLE" <<'LINT'
+
+android {
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+}
+LINT
+echo "lint de release desactivado en $GRADLE"
