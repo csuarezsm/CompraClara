@@ -92,8 +92,7 @@ class _SectionsTab extends StatelessWidget {
               child: ReorderableListView.builder(
                 padding: const EdgeInsets.only(bottom: 8),
                 itemCount: sections.length,
-                onReorder: (oldIndex, newIndex) {
-                  if (newIndex > oldIndex) newIndex -= 1;
+                onReorderItem: (oldIndex, newIndex) {
                   final ids = sections.map((s) => s.id).toList();
                   final moved = ids.removeAt(oldIndex);
                   ids.insert(newIndex, moved);
