@@ -43,6 +43,9 @@ jobs:
       - name: Analizar
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
+      - name: Pruebas
+        run: flutter test
+
       - name: Compilar APK
         run: flutter build apk --release --target-platform android-arm64 --build-number=${{ github.run_number }}
 

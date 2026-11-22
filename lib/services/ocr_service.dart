@@ -109,9 +109,16 @@ class OcrService {
     }
     double? total;
     final lines = <TicketLine>[];
+    String? pendingName; // renglón con nombre pero sin precio (el precio viene debajo)
+    var started = false;
     for (final row in rows) {
       final prices = _price.allMatches(row).toList();
       final lower = row.toLowerCase();
+      if (prices.isEmpty) {
+        final letters = row.replaceAll(RegExp(r'[^A-Za-zÁÉÍÓÚÑáéíóúñ]'), '');
+        pendingName = started && letters.length >= 3 && !_skip.hasMatch(row) ? row.trim() : null;
+        continue;
+      }
       if (lower.contains('total') && !lower.contains('subtotal') && prices.isNotEmpty) {
         total ??= _num(prices.last.group(1)!);
         continue;
@@ -129,14 +136,18 @@ class OcrService {
         final namePart = row.substring(detail.end).replaceAll(_price, '').replaceAll(RegExp(r'[€/a-z]+$', caseSensitive: false), '').trim();
         if (namePart.replaceAll(RegExp(r'[^A-Za-zÁÉÍÓÚÑáéíóúñ]'), '').length >= 3) {
           lines.add(TicketLine(raw: namePart, qty: q, unitPrice: up, amount: amount));
+        } else if (pendingName != null) {
+          lines.add(TicketLine(raw: pendingName, qty: q, unitPrice: up, amount: amount));
         } else if (lines.isNotEmpty) {
           lines.last
             ..qty = q
             ..unitPrice = up
             ..amount = amount ?? lines.last.amount;
         }
+        pendingName = null;
         continue;
       }
+      pendingName = null;
 
       final amount = _num(prices.last.group(1)!);
       var name = row.substring(0, prices.last.start).replaceAll(_price, ' ');
@@ -148,6 +159,7 @@ class OcrService {
         name = name.substring(lead.end).trim();
       }
       if (name.replaceAll(RegExp(r'[^A-Za-zÁÉÍÓÚÑáéíóúñ]'), '').length < 3) continue;
+      started = true;
       lines.add(TicketLine(
         raw: name,
         qty: qty,
