@@ -4,6 +4,7 @@ import '../data/models.dart';
 import '../main.dart' show repo;
 import '../widgets.dart';
 import 'list_detail_screen.dart';
+import 'settings_screen.dart';
 
 class ListsScreen extends StatefulWidget {
   const ListsScreen({super.key});
@@ -59,6 +60,13 @@ class _ListsScreenState extends State<ListsScreen> {
         title: Text(_archived ? 'Listas archivadas' : 'Mis listas'),
         actions: [
           IconButton(
+            tooltip: 'Ajustes',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
+          IconButton(
             tooltip: _archived ? 'Ver listas activas' : 'Ver archivadas',
             icon: Icon(_archived ? Icons.checklist : Icons.archive_outlined),
             onPressed: () => setState(() => _archived = !_archived),
@@ -79,12 +87,25 @@ class _ListsScreenState extends State<ListsScreen> {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(32),
-                child: Text(
-                  _archived
-                      ? 'No hay listas archivadas.'
-                      : 'Todavía no tienes listas.\nPulsa «Nueva lista» para empezar.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _archived
+                          ? 'No hay listas archivadas.'
+                          : 'Todavía no tienes listas.\nPulsa «Nueva lista» para empezar.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    if (!_archived) ...[
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: () => loadDemoWithFeedback(context),
+                        icon: const Icon(Icons.science_outlined),
+                        label: const Text('Probar con datos de ejemplo'),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             );

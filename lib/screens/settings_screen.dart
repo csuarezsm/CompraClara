@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/demo.dart';
 import '../main.dart' show repo;
 import '../services/location_service.dart';
 import '../widgets.dart';
@@ -39,7 +40,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ajustes de comparación')),
+      appBar: AppBar(title: const Text('Ajustes')),
       body: RepoBuilder<_SettingsData>(
         load: _load,
         builder: (context, d) {
@@ -114,10 +115,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'Para que un supermercado entre en la comparación debe tener su ubicación guardada '
                 '(en su ficha, botón de ubicación).',
               ),
+              const Divider(height: 40),
+              Text('Datos', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.science_outlined),
+                title: const Text('Cargar datos de ejemplo'),
+                subtitle: const Text('4 supermercados ficticios (3 en Lanzarote y 1 en Gran Canaria), '
+                    '26 artículos con precios y 2 listas'),
+                onTap: () => loadDemoWithFeedback(context),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error),
+                title: const Text('Borrar todos los datos'),
+                subtitle: const Text('Listas, artículos, supermercados, precios y ajustes'),
+                onTap: () async {
+                  final ok = await confirm(context,
+                      title: 'Borrar todos los datos',
+                      message: 'No se puede deshacer.',
+                      okLabel: 'Borrar todo');
+                  if (ok) {
+                    await repo.clearAll();
+                    if (context.mounted) snack(context, 'Datos borrados');
+                  }
+                },
+              ),
             ],
           );
         },
       ),
     );
   }
+}
+
+Future<void> loadDemoWithFeedback(BuildContext context) async {
+  final ok = await confirm(context,
+      title: 'Cargar datos de ejemplo',
+      message: 'Se añaden supermercados, artículos, precios y listas ficticios a lo que ya tengas. '
+          'Puedes borrarlo todo después desde Ajustes.',
+      okLabel: 'Cargar');
+  if (!ok || !context.mounted) return;
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const Center(child: CircularProgressIndicator()),
+  );
+  try {
+    await loadDemoData(repo);
+  } finally {
+    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+  }
+  if (context.mounted) snack(context, 'Datos de ejemplo cargados');
 }

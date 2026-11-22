@@ -106,6 +106,19 @@ class Repo extends ChangeNotifier {
     await setSetting('zone_lng', lng?.toString());
   }
 
+  /// Borra todos los datos del móvil (listas, artículos, tiendas, precios y ajustes).
+  Future<void> clearAll() async {
+    await db.transaction((t) async {
+      for (final table in const [
+        'list_items', 'lists', 'prices', 'product_store', 'barcodes',
+        'products', 'store_sections', 'stores', 'settings',
+      ]) {
+        await t.delete(table);
+      }
+    });
+    _changed();
+  }
+
   // ------------------------------------------------------ Secciones de tienda
 
   Future<List<StoreSection>> sections(String storeId) async {
@@ -472,8 +485,8 @@ class Repo extends ChangeNotifier {
 
   /// Una observación por artículo, tienda y día (la última sustituye).
   Future<void> recordPrice(String productId, String storeId, double price,
-      {bool offer = false, String source = 'manual', bool notify = true}) async {
-    final today = todayIso();
+      {bool offer = false, String source = 'manual', bool notify = true, String? date}) async {
+    final today = date ?? todayIso();
     await db.delete('prices',
         where: 'product_id = ? AND store_id = ? AND date = ?',
         whereArgs: [productId, storeId, today]);
