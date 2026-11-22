@@ -1,0 +1,59 @@
+name: Compilar Android
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Versiones
+        run: flutter --version
+
+      - name: Generar proyecto Android
+        run: flutter create --platforms=android --org com.itcanarias --project-name compraclara .
+
+      - name: Ajustar permisos y nombre
+        run: bash tool/patch_android.sh
+
+      - name: Quitar test de ejemplo
+        run: rm -f test/widget_test.dart
+
+      - name: Dependencias
+        run: flutter pub get
+
+      - name: Analizar
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Compilar APK
+        run: flutter build apk --release
+
+      - name: Subir APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: compraclara-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Publicar en Releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/app-release.apk

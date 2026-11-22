@@ -1,0 +1,27 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+
+# El proyecto Android lo genera el flujo de CI (flutter create) y tool/patch_android.sh
+android/
+ios/
+web/
+linux/
+macos/
+windows/
+test/widget_test.dart
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.jks
+*.keystore
+key.properties
+.DS_Store
