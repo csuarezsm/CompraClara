@@ -10,21 +10,26 @@ import '../widgets.dart';
 
 /// Pantalla de cámara: devuelve el código leído (o escrito a mano).
 class ScanScreen extends StatefulWidget {
-  const ScanScreen({super.key});
+  const ScanScreen({super.key, this.allFormats = false});
+
+  /// true para tarjetas de fidelidad (Code 128, QR…); false solo productos.
+  final bool allFormats;
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  final MobileScannerController _controller = MobileScannerController(
+  late final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
-    formats: const [
-      BarcodeFormat.ean13,
-      BarcodeFormat.ean8,
-      BarcodeFormat.upcA,
-      BarcodeFormat.upcE,
-    ],
+    formats: widget.allFormats
+        ? const [BarcodeFormat.all]
+        : const [
+            BarcodeFormat.ean13,
+            BarcodeFormat.ean8,
+            BarcodeFormat.upcA,
+            BarcodeFormat.upcE,
+          ],
   );
   bool _done = false;
 
@@ -192,6 +197,9 @@ Future<Product?> showNewProductDialog(
                 brand: brand.text,
                 size: size.text,
                 section: section,
+                allergens: off?.allergens.join(',') ?? '',
+                nutriscore: off?.nutriscore ?? '',
+                labels: off?.labels.join(',') ?? '',
               );
               await repo.addBarcode(p.id, ean);
               if (ctx.mounted) Navigator.pop(ctx, p);

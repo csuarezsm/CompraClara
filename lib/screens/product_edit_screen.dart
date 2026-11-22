@@ -4,7 +4,11 @@ import '../data/models.dart';
 import '../main.dart' show repo;
 import '../util.dart';
 import '../widgets.dart';
+import '../data/repository.dart';
+import '../services/off_service.dart';
+import 'label_capture.dart';
 import 'scan_screen.dart';
+import 'settings_screen.dart' show allergenNames, dietNames;
 
 class _EditData {
   _EditData({
@@ -215,18 +219,31 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                   ),
               ],
               const SizedBox(height: 16),
-              Text('Historial de precios', style: Theme.of(context).textTheme.titleMedium),
+              _FoodInfo(product: d.product, barcodes: d.barcodes),
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(child: Text('Historial de precios', style: Theme.of(context).textTheme.titleMedium)),
+                TextButton.icon(
+                  onPressed: () => captureLabelPrice(context, product: d.product),
+                  icon: const Icon(Icons.sell_outlined, size: 18),
+                  label: const Text('Foto etiqueta'),
+                ),
+              ]),
               if (d.history.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('Aún no hay precios. Se guardan al marcar el precio durante la compra.'),
+                  child: Text('Aún no hay precios. Se guardan durante la compra, al leer un ticket o una etiqueta.'),
                 ),
-              for (final h in d.history.take(15))
+              for (final h in d.history.take(20))
                 ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   title: Text('${money(h.price)}${h.offer ? '  (oferta)' : ''}'),
                   subtitle: Text('${h.storeName} · ${dateEs(h.date)}'),
+                  trailing: Builder(builder: (_) {
+                    final up = Repo.unitPrice(d.product.unitQty, d.product.unit, h.price);
+                    return up == null ? const SizedBox.shrink() : Text(unitPriceText(up.value, up.unit));
+                  }),
                 ),
             ],
           ),
@@ -266,5 +283,74 @@ class _LocationRow extends StatelessWidget {
         onChanged: onChanged,
       ),
     );
+  }
+}
+
+/// Nutri-Score, alérgenos y etiquetas (de Open Food Facts) con opción de actualizar.
+class _FoodInfo extends StatelessWidget {
+  const _FoodInfo({required this.product, required this.barcodes});
+
+  final Product product;
+  final List<String> barcodes;
+
+  static const _nsColors = {
+    'a': Color(0xFF038141),
+    'b': Color(0xFF85BB2F),
+    'c': Color(0xFFFECB02),
+    'd': Color(0xFFEE8100),
+    'e': Color(0xFFE63E11),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final allergens = product.allergens.split(',').where((e) => e.trim().isNotEmpty).toList();
+    final labels = product.labels.split(',').where((e) => dietNames.containsKey(e.trim())).toList();
+    final ns = product.nutriscore;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const SizedBox(height: 16),
+      Row(children: [
+        Expanded(child: Text('Información alimentaria', style: Theme.of(context).textTheme.titleMedium)),
+        if (barcodes.isNotEmpty)
+          TextButton.icon(
+            icon: const Icon(Icons.sync, size: 18),
+            label: const Text('Actualizar'),
+            onPressed: () async {
+              OffProduct? off;
+              try {
+                off = await OffService.lookup(barcodes.first);
+              } catch (_) {
+                off = null;
+              }
+              if (off == null) {
+                if (context.mounted) snack(context, 'Sin datos en Open Food Facts para este código');
+                return;
+              }
+              await repo.setProductFoodInfo(product.id,
+                  allergens: off.allergens.join(','), nutriscore: off.nutriscore, labels: off.labels.join(','));
+              if (context.mounted) snack(context, 'Datos actualizados');
+            },
+          ),
+      ]),
+      if (ns.isEmpty && allergens.isEmpty && labels.isEmpty)
+        Text(barcodes.isEmpty
+            ? 'Añade el código de barras para traer Nutri-Score y alérgenos de Open Food Facts.'
+            : 'Sin datos todavía.'),
+      if (ns.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(children: [
+            const Text('Nutri-Score '),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              decoration: BoxDecoration(color: _nsColors[ns] ?? Colors.grey, borderRadius: BorderRadius.circular(6)),
+              child: Text(ns.toUpperCase(),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+            ),
+          ]),
+        ),
+      if (allergens.isNotEmpty)
+        Text('Alérgenos: ${allergens.map((k) => allergenNames[k.trim()] ?? k.trim()).join(', ')}'),
+      if (labels.isNotEmpty) Text('Apto: ${labels.map((k) => dietNames[k.trim()] ?? k).join(', ')}'),
+    ]);
   }
 }

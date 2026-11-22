@@ -147,6 +147,27 @@ class _SectionsTab extends StatelessWidget {
                 },
               ),
             ),
+            FutureBuilder<int>(
+              future: repo.routeSamples(storeId),
+              builder: (context, snap) {
+                final n = snap.data ?? 0;
+                if (n == 0) return const SizedBox.shrink();
+                return TextButton.icon(
+                  onPressed: () async {
+                    final ok = await confirm(context,
+                        title: 'Ordenar según mis compras',
+                        message: 'Se reordenan las secciones según el orden en que cogiste las cosas '
+                            'en $n compra(s) en esta tienda.',
+                        okLabel: 'Ordenar');
+                    if (!ok) return;
+                    final done = await repo.applyLearnedOrder(storeId);
+                    if (context.mounted) snack(context, done ? 'Secciones reordenadas' : 'Aún no hay datos suficientes');
+                  },
+                  icon: const Icon(Icons.route_outlined),
+                  label: Text('Ordenar según mis compras ($n)'),
+                );
+              },
+            ),
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(12),

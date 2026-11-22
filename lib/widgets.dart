@@ -37,6 +37,7 @@ Future<String?> promptText(
   String initial = '',
   String hint = '',
   String okLabel = 'Guardar',
+  int maxLines = 1,
 }) {
   final c = TextEditingController(text: initial);
   return showDialog<String>(
@@ -46,9 +47,11 @@ Future<String?> promptText(
       content: TextField(
         controller: c,
         autofocus: true,
+        maxLines: maxLines,
+        minLines: 1,
         textCapitalization: TextCapitalization.sentences,
         decoration: InputDecoration(hintText: hint),
-        onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        onSubmitted: maxLines > 1 ? null : (v) => Navigator.pop(ctx, v.trim()),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),

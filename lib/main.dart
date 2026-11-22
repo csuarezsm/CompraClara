@@ -1,37 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:quick_actions/quick_actions.dart';
 
 import 'data/repository.dart';
 import 'screens/catalog_screen.dart';
 import 'screens/lists_screen.dart';
+import 'screens/more_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'screens/scan_screen.dart';
 import 'screens/stores_screen.dart';
+import 'screens/ticket_screen.dart';
 
-/// Acceso global a los datos (todo es local en el MVP).
+/// Acceso global a los datos (todo es local en el móvil).
 late Repo repo;
+
+final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   repo = await Repo.open();
-  runApp(const CompraClaraApp());
+  final onboarded = await repo.getSetting('onboarded') != null;
+  runApp(CompraClaraApp(showOnboarding: !onboarded));
 }
 
 class CompraClaraApp extends StatelessWidget {
-  const CompraClaraApp({super.key});
+  const CompraClaraApp({super.key, required this.showOnboarding});
+
+  final bool showOnboarding;
 
   @override
   Widget build(BuildContext context) {
     final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D5B));
+    final dark = ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D5B), brightness: Brightness.dark);
     return MaterialApp(
       title: 'CompraClara',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: scheme,
-        useMaterial3: true,
-        appBarTheme: AppBarTheme(
-          backgroundColor: scheme.surface,
-          scrolledUnderElevation: 1,
-        ),
-      ),
+      theme: ThemeData(colorScheme: scheme, useMaterial3: true),
+      darkTheme: ThemeData(colorScheme: dark, useMaterial3: true),
       locale: const Locale('es'),
       supportedLocales: const [Locale('es')],
       localizationsDelegates: const [
@@ -39,7 +45,7 @@ class CompraClaraApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const HomeShell(),
+      home: showOnboarding ? const OnboardingScreen() : const HomeShell(),
     );
   }
 }
@@ -55,6 +61,34 @@ class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _setupQuickActions();
+  }
+
+  /// Accesos directos al mantener pulsado el icono de la app.
+  void _setupQuickActions() {
+    const qa = QuickActions();
+    qa.initialize((type) {
+      final nav = navigatorKey.currentState;
+      if (nav == null) return;
+      switch (type) {
+        case 'scan':
+          scanProduct(nav.context);
+        case 'ticket':
+          nav.push(MaterialPageRoute(builder: (_) => const TicketScreen()));
+        case 'lists':
+          setState(() => _index = 0);
+      }
+    });
+    qa.setShortcutItems(const [
+      ShortcutItem(type: 'lists', localizedTitle: 'Mis listas'),
+      ShortcutItem(type: 'scan', localizedTitle: 'Escanear producto'),
+      ShortcutItem(type: 'ticket', localizedTitle: 'Leer ticket'),
+    ]);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(
@@ -63,6 +97,7 @@ class _HomeShellState extends State<HomeShell> {
           ListsScreen(),
           CatalogScreen(),
           StoresScreen(),
+          MoreScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -83,6 +118,11 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icon(Icons.storefront_outlined),
             selectedIcon: Icon(Icons.storefront),
             label: 'Súpers',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.apps_outlined),
+            selectedIcon: Icon(Icons.apps),
+            label: 'Más',
           ),
         ],
       ),

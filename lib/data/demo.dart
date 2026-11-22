@@ -83,12 +83,45 @@ Future<void> loadDemoData(Repo repo) async {
       final s = _stores[si];
       if (s.skipEvery > 0 && pi % s.skipEvery == 0) continue;
       final price = double.parse((p.price * s.factor * _jitter(pi, si)).toStringAsFixed(2));
-      final old = double.parse((price * 0.96).toStringAsFixed(2));
+      // Algunos artículos han bajado de precio y otros han subido.
+      final old = double.parse((price * (pi % 5 == 0 ? 1.12 : 0.96)).toStringAsFixed(2));
       await repo.recordPrice(prod.id, storeIds[si], old,
           date: iso(today.subtract(const Duration(days: 21))), notify: false);
       await repo.recordPrice(prod.id, storeIds[si], price,
           offer: (pi + si) % 11 == 0, date: iso(today), notify: false);
     }
+  }
+
+  // Compras de las últimas 8 semanas (para habituales, historial y resumen)
+  final prices0 = await repo.lastPrices(storeIds.first);
+  for (var w = 8; w >= 1; w--) {
+    final idx = <int>[0, 4, 10, 12];
+    if (w.isEven) idx.addAll([15, 16, 21]);
+    if (w % 4 == 0) idx.addAll([19, 23, 24]);
+    if (w % 3 == 0) idx.addAll([5, 8]);
+    final lines = <({String? productId, String raw, double qty, double? unitPrice, double? amount})>[];
+    var total = 0.0;
+    for (final i in idx) {
+      final pid = productIds[i];
+      final unit = prices0[pid] ?? _products[i].price;
+      final qty = i == 10 ? 6.0 : (i == 4 ? 2.0 : 1.0);
+      total += unit * qty;
+      lines.add((productId: pid, raw: _products[i].name, qty: qty, unitPrice: unit, amount: unit * qty));
+    }
+    await repo.saveTicketPurchase(
+      storeId: null,
+      storeName: _stores.first.name,
+      date: iso(today.subtract(Duration(days: 7 * w))),
+      total: double.parse(total.toStringAsFixed(2)),
+      lines: lines,
+    );
+  }
+
+  // Pack de ejemplo
+  final pack = await repo.createList('Pack desayuno', isTemplate: true);
+  for (final i in const [10, 12, 18, 19]) {
+    final prod = await repo.productById(productIds[i]);
+    if (prod != null) await repo.addItem(pack.id, prod, notify: false);
   }
 
   // Lista de ejemplo en la tienda principal

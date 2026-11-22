@@ -65,3 +65,78 @@ String kmText(double km) {
   if (lat.abs() > 90 || lng.abs() > 180) return null;
   return (lat: lat, lng: lng);
 }
+
+String isoDate(DateTime d) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${d.year}-${two(d.month)}-${two(d.day)}';
+}
+
+/// Lee el formato de un artículo y lo pasa a unidad base:
+/// "1 L" -> 1 l, "500 g" -> 0,5 kg, "6 x 1,5 L" -> 9 l, "12 ud" -> 12 ud, "750 ml" -> 0,75 l.
+({double qty, String unit})? parseSize(String size) {
+  final s = size.toLowerCase().replaceAll(',', '.').trim();
+  if (s.isEmpty) return null;
+  final m = RegExp(r'(?:(\d+(?:\.\d+)?)\s*[x×]\s*)?(\d+(?:\.\d+)?)\s*(kg|kilo|kilos|g|gr|grs|gramos|l|lt|litro|litros|cl|ml|ud|uds|u|unidades|unidad|rollos|lavados|bolsitas|cápsulas|capsulas)\b')
+      .firstMatch(s);
+  if (m == null) return null;
+  final mult = m.group(1) == null ? 1.0 : double.parse(m.group(1)!);
+  final n = double.parse(m.group(2)!);
+  final u = m.group(3)!;
+  double qty;
+  String unit;
+  switch (u) {
+    case 'kg':
+    case 'kilo':
+    case 'kilos':
+      qty = n;
+      unit = 'kg';
+    case 'g':
+    case 'gr':
+    case 'grs':
+    case 'gramos':
+      qty = n / 1000;
+      unit = 'kg';
+    case 'l':
+    case 'lt':
+    case 'litro':
+    case 'litros':
+      qty = n;
+      unit = 'l';
+    case 'cl':
+      qty = n / 100;
+      unit = 'l';
+    case 'ml':
+      qty = n / 1000;
+      unit = 'l';
+    default:
+      qty = n;
+      unit = 'ud';
+  }
+  final total = qty * mult;
+  if (total <= 0) return null;
+  return (qty: total, unit: unit);
+}
+
+/// "12,34 €/kg"
+String unitPriceText(double value, String unit) => '${money(value)}/$unit';
+
+/// Texto de ticket normalizado para reconocer alias ("LECHE  ENT. 1L" -> "leche ent 1l").
+String normalizeTicketText(String s) => s
+    .toLowerCase()
+    .replaceAll(RegExp(r'[^a-z0-9áéíóúñü ]'), ' ')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
+
+String csvCell(Object? v) {
+  final s = (v ?? '').toString();
+  if (s.contains(';') || s.contains('"') || s.contains('\n')) {
+    return '"${s.replaceAll('"', '""')}"';
+  }
+  return s;
+}
+
+String csvNum(Object? v) {
+  if (v == null) return '';
+  if (v is num) return v.toStringAsFixed(2).replaceAll('.', ',');
+  return v.toString();
+}

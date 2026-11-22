@@ -4,6 +4,8 @@ import '../data/models.dart';
 import '../main.dart' show repo;
 import '../util.dart';
 import '../widgets.dart';
+import 'label_capture.dart';
+import 'ticket_screen.dart';
 
 class _ShopData {
   _ShopData({
@@ -101,42 +103,143 @@ class _ShopScreenState extends State<ShopScreen> {
     for (final i in picked) {
       final p = i.price ?? d.prices[i.productId];
       if (p != null) {
-        total += p * i.qty;
+        total += p * i.boughtQty;
         priced++;
       }
     }
+    var removeBought = true;
     final action = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Resumen de la compra'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Cogidos: ${picked.length}'),
-            Text('Pendientes: ${pending.length}'),
-            const SizedBox(height: 8),
-            Text('Total con precio: ${money(total)}'
-                '${priced < picked.length ? '  (${picked.length - priced} sin precio)' : ''}',
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            if (pending.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Text('Te quedan sin coger:'),
-              for (final i in pending.take(8)) Text('• ${i.name}'),
-              if (pending.length > 8) Text('… y ${pending.length - 8} más'),
-            ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Terminar la compra'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Cogidos: ${picked.length} · Pendientes: ${pending.length}'),
+                const SizedBox(height: 8),
+                Text('Total estimado: ${money(total)}'
+                    '${priced < picked.length ? '  (${picked.length - priced} sin precio)' : ''}',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                if (pending.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text('Te quedan sin coger:'),
+                  for (final i in pending.take(8)) Text('• ${i.name}'),
+                  if (pending.length > 8) Text('… y ${pending.length - 8} más'),
+                ],
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: removeBought,
+                  onChanged: (v) => setState(() => removeBought = v ?? true),
+                  title: const Text('Quitar de la lista lo comprado'),
+                  subtitle: const Text('Lo pendiente se queda para la próxima vez'),
+                ),
+                const SizedBox(height: 4),
+                const Text('Con «Leer ticket» guardas los precios reales y repasas lo cobrado (modo caja).',
+                    style: TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, 'back'), child: const Text('Seguir')),
+            OutlinedButton(
+              onPressed: picked.isEmpty ? null : () => Navigator.pop(ctx, 'ticket'),
+              child: const Text('Leer ticket'),
+            ),
+            FilledButton(onPressed: () => Navigator.pop(ctx, 'finish'), child: const Text('Terminar')),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, 'back'), child: const Text('Seguir')),
-          TextButton(onPressed: () => Navigator.pop(ctx, 'open'), child: const Text('Dejar abierta')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, 'archive'), child: const Text('Archivar lista')),
-        ],
       ),
     );
     if (action == null || action == 'back' || !mounted) return;
-    if (action == 'archive') await repo.setListArchived(d.list.id, true);
-    if (mounted) Navigator.of(context).pop();
+    if (action == 'ticket') {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => TicketScreen(listId: d.list.id, storeId: d.store.id),
+      ));
+      return;
+    }
+    final purchaseId = await repo.finishShopping(d.list.id, d.store.id);
+    if (removeBought) {
+      final left = await repo.removePicked(d.list.id);
+      if (left == 0) await repo.setListArchived(d.list.id, true);
+    }
+    if (!mounted) return;
+    snack(context, purchaseId == null ? 'Compra terminada' : 'Compra guardada en el historial (${money(total)})');
+    Navigator.of(context).pop();
+  }
+
+  /// Opciones de un artículo: cantidad parcial, precio, foto de etiqueta, sección.
+  Future<void> _options(_ShopData d, SectionGroup g, ListItem it) async {
+    final a = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(title: Text(it.name, style: Theme.of(ctx).textTheme.titleLarge)),
+          if (it.qty > 1)
+            ListTile(
+              leading: const Icon(Icons.exposure_neg_1),
+              title: const Text('Coger solo una parte'),
+              subtitle: Text('Pedidos: ${qtyText(it.qty)}'),
+              onTap: () => Navigator.pop(ctx, 'partial'),
+            ),
+          ListTile(
+            leading: const Icon(Icons.euro),
+            title: const Text('Poner precio'),
+            onTap: () => Navigator.pop(ctx, 'price'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.sell_outlined),
+            title: const Text('Foto de la etiqueta'),
+            subtitle: const Text('Lee el precio de la estantería'),
+            onTap: () => Navigator.pop(ctx, 'label'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.swap_horiz),
+            title: const Text('Está en otra sección'),
+            onTap: () => Navigator.pop(ctx, 'section'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.remove_shopping_cart_outlined),
+            title: const Text('No lo tienen'),
+            onTap: () => Navigator.pop(ctx, 'none'),
+          ),
+        ]),
+      ),
+    );
+    if (a == null || !mounted) return;
+    switch (a) {
+      case 'partial':
+        final v = await promptText(context,
+            title: '¿Cuántos coges de ${qtyText(it.qty)}?', okLabel: 'Coger', hint: '1');
+        final n = v == null ? null : parseNum(v);
+        if (n != null && n > 0) await repo.pickPartial(it, n);
+      case 'price':
+        await _setPrice(d, it);
+      case 'label':
+        await captureLabelPrice(context, item: it, storeId: d.store.id);
+      case 'section':
+        final secs = await repo.sections(d.store.id);
+        if (!mounted) return;
+        final sid = await showModalBottomSheet<String>(
+          context: context,
+          showDragHandle: true,
+          builder: (ctx) => SafeArea(
+            child: ListView(shrinkWrap: true, children: [
+              for (final s in secs.where((s) => !s.hidden))
+                ListTile(title: Text(s.name), onTap: () => Navigator.pop(ctx, s.id)),
+            ]),
+          ),
+        );
+        if (sid != null) {
+          await repo.setLocation(it.productId, d.store.id, sid);
+          if (mounted) snack(context, 'Guardado: en esta tienda está en otra sección');
+        }
+      case 'none':
+        await _unavailable(it);
+    }
   }
 
   @override
@@ -194,7 +297,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       onSelect: (i) => setState(() => _sel = i),
                     ),
                     const Divider(height: 1),
-                    Expanded(child: _SectionBody(d: d, group: groups[sel], onPick: _pick, onUnavailable: _unavailable, onPrice: _setPrice)),
+                    Expanded(child: _SectionBody(d: d, group: groups[sel], onPick: _pick, onUnavailable: _unavailable, onPrice: _setPrice, onOptions: _options)),
                   ],
                 ),
           bottomNavigationBar: groups.isEmpty
@@ -255,6 +358,7 @@ class _SectionBody extends StatelessWidget {
     required this.onPick,
     required this.onUnavailable,
     required this.onPrice,
+    required this.onOptions,
   });
 
   final _ShopData d;
@@ -262,6 +366,7 @@ class _SectionBody extends StatelessWidget {
   final Future<void> Function(_ShopData, SectionGroup, ListItem) onPick;
   final Future<void> Function(ListItem) onUnavailable;
   final Future<void> Function(_ShopData, ListItem) onPrice;
+  final Future<void> Function(_ShopData, SectionGroup, ListItem) onOptions;
 
   @override
   Widget build(BuildContext context) {
@@ -321,6 +426,7 @@ class _SectionBody extends StatelessWidget {
                 ),
               ),
               onTap: () => onPick(d, group, it),
+              onLongPress: () => onOptions(d, group, it),
             ),
           ),
         if (picked.isNotEmpty)
@@ -332,7 +438,7 @@ class _SectionBody extends StatelessWidget {
                   leading: const Icon(Icons.check_circle),
                   title: Text(it.name,
                       style: const TextStyle(decoration: TextDecoration.lineThrough)),
-                  subtitle: Text('${qtyText(it.qty)} ud'
+                  subtitle: Text('${qtyText(it.boughtQty)} ud'
                       '${it.price != null ? ' · ${money(it.price)}' : ''}'),
                   trailing: const Text('Deshacer'),
                   onTap: () => repo.setStatus(it.id, statusPending),
