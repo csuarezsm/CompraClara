@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../data/models.dart';
 import '../main.dart' show repo;
+import '../data/sections.dart';
 import '../services/quick_parse.dart';
+import '../util.dart';
 import '../services/speech_service.dart';
 import '../widgets.dart';
 import 'packs_screen.dart' show addPackDialog;
+import 'product_create_screen.dart';
 import 'scan_screen.dart';
 
 /// Añadir artículos a una lista: buscar, escribir varios de corrido,
@@ -51,7 +54,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
   }
 
   Future<void> _createAndAdd(String name) async {
-    final p = await repo.createProduct(name: name);
+    final p = await repo.productByName(name) ?? await repo.createProduct(name: name);
     await repo.addItem(widget.listId, p);
     if (!mounted) return;
     _clear();
@@ -181,9 +184,19 @@ class _AddItemScreenState extends State<AddItemScreen> {
               ] else if (q.isNotEmpty && !exact)
                 ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.add)),
-                  title: Text('Crear «$q» y añadir'),
-                  subtitle: const Text('Se guarda en el catálogo con su sección'),
+                  title: Text('Crear «${cleanName(q)}» y añadir'),
+                  subtitle: Text('Sección: ${guessSection(q)} · se puede cambiar después'),
                   onTap: () => _createAndAdd(q),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      final p = await createProductFlow(context, initialName: q);
+                      if (p != null && mounted) {
+                        _clear();
+                        await _add(p);
+                      }
+                    },
+                    child: const Text('Con detalles'),
+                  ),
                 ),
               if (q.isEmpty)
                 Padding(

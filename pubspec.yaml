@@ -1,7 +1,7 @@
 name: compraclara
 description: CompraClara - lista de la compra inteligente por secciones del supermercado.
 publish_to: 'none'
-version: 0.4.0+1
+version: 0.4.1+1
 
 environment:
   sdk: ">=3.5.0 <4.0.0"

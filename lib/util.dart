@@ -140,3 +140,22 @@ String csvNum(Object? v) {
   if (v is num) return v.toStringAsFixed(2).replaceAll('.', ',');
   return v.toString();
 }
+
+/// Texto normalizado para comparar nombres: minúsculas, sin acentos ni signos.
+String normText(String s) {
+  const from = 'áàäâéèëêíìïîóòöôúùüûñç';
+  const to = 'aaaaeeeeiiiioooouuuunc';
+  final b = StringBuffer();
+  for (final ch in s.toLowerCase().split('')) {
+    final i = from.indexOf(ch);
+    b.write(i >= 0 ? to[i] : ch);
+  }
+  return b.toString().replaceAll(RegExp(r'[^a-z0-9 ]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
+/// Nombre limpio: espacios simples y primera letra en mayúscula ("  leche  entera" -> "Leche entera").
+String cleanName(String s) {
+  final t = s.trim().replaceAll(RegExp(r'\s+'), ' ');
+  if (t.isEmpty) return t;
+  return t[0].toUpperCase() + t.substring(1);
+}

@@ -469,7 +469,7 @@ class _ProductPickerState extends State<_ProductPicker> {
                   onTap: () async {
                     final raw = _q.text.trim().isEmpty ? widget.initial : _q.text.trim();
                     final name = raw.isEmpty ? 'Artículo' : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
-                    final p = await repo.createProduct(name: name);
+                    final p = await repo.productByName(name) ?? await repo.createProduct(name: name);
                     if (context.mounted) Navigator.pop(context, p);
                   },
                 ),

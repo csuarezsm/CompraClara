@@ -4,6 +4,7 @@ import '../data/models.dart';
 import '../main.dart' show repo;
 import '../widgets.dart';
 import 'product_edit_screen.dart';
+import 'product_create_screen.dart';
 import 'scan_screen.dart';
 
 /// Mantenimiento de artículos.
@@ -24,11 +25,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 
   Future<void> _new() async {
-    final name = await promptText(context,
-        title: 'Nuevo artículo', hint: 'Leche entera', okLabel: 'Crear');
-    if (name == null) return;
-    final p = await repo.createProduct(name: name);
-    if (mounted) _open(p.id);
+    final p = await createProductFlow(context, initialName: _query.trim());
+    if (p != null && mounted) snack(context, 'Guardado: ${p.name}');
   }
 
   Future<void> _scan() async {

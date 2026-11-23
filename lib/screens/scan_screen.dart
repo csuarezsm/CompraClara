@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../data/models.dart';
-import '../data/sections.dart';
 import '../main.dart' show repo;
 import '../services/off_service.dart';
 import '../widgets.dart';
+import 'product_create_screen.dart';
 
 /// Pantalla de cámara: devuelve el código leído (o escrito a mano).
 class ScanScreen extends StatefulWidget {
@@ -137,77 +137,5 @@ Future<Product?> resolveBarcode(BuildContext context, String ean) async {
   }
   if (!context.mounted) return null;
   Navigator.of(context, rootNavigator: true).pop();
-  return showNewProductDialog(context, ean: ean, off: off);
-}
-
-Future<Product?> showNewProductDialog(
-  BuildContext context, {
-  required String ean,
-  OffProduct? off,
-}) {
-  final name = TextEditingController(text: off?.name ?? '');
-  final brand = TextEditingController(text: off?.brand ?? '');
-  final size = TextEditingController(text: off?.quantity ?? '');
-  var section = guessSection(off?.name ?? '', tags: off?.categories ?? const []);
-
-  return showDialog<Product>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) => AlertDialog(
-        title: Text(off == null ? 'Producto nuevo' : 'Producto encontrado'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                off == null
-                    ? 'Código $ean no encontrado. Ponle nombre y se guardará para la próxima vez.'
-                    : 'Código $ean · datos de Open Food Facts. Revísalos antes de guardar.',
-                style: Theme.of(ctx).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: name,
-                autofocus: off == null,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Nombre'),
-              ),
-              TextField(
-                controller: brand,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(labelText: 'Marca'),
-              ),
-              TextField(
-                controller: size,
-                decoration: const InputDecoration(labelText: 'Formato (1 L, 500 g…)'),
-              ),
-              const SizedBox(height: 8),
-              SectionDropdown(value: section, onChanged: (v) => setState(() => section = v)),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () async {
-              final n = name.text.trim();
-              if (n.isEmpty) return;
-              final p = await repo.createProduct(
-                name: n,
-                brand: brand.text,
-                size: size.text,
-                section: section,
-                allergens: off?.allergens.join(',') ?? '',
-                nutriscore: off?.nutriscore ?? '',
-                labels: off?.labels.join(',') ?? '',
-              );
-              await repo.addBarcode(p.id, ean);
-              if (ctx.mounted) Navigator.pop(ctx, p);
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
-    ),
-  );
+  return createProductFlow(context, ean: ean, off: off);
 }

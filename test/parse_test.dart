@@ -73,6 +73,18 @@ void main() {
     });
   });
 
+  group('Nombres de artículos', () {
+    test('se comparan sin mayúsculas, acentos ni signos', () {
+      expect(normText('Leche  ENTERA'), normText('leche entera'));
+      expect(normText('Atún en aceite'), 'atun en aceite');
+      expect(normText('Café molido.'), 'cafe molido');
+    });
+    test('nombre limpio con mayúscula inicial', () {
+      expect(cleanName('  leche   entera '), 'Leche entera');
+      expect(cleanName(''), '');
+    });
+  });
+
   test('distancia Arrecife - Las Palmas', () {
     expect(distanceKm(28.963, -13.55, 28.1235, -15.4363), greaterThan(150));
   });

@@ -357,10 +357,33 @@ class Repo extends ChangeNotifier {
   }
 
   /// Busca un artículo por nombre exacto (sin distinguir mayúsculas).
+  /// Artículo con el mismo nombre, sin distinguir mayúsculas, acentos ni signos.
   Future<Product?> productByName(String name) async {
-    final r = await db.query('products',
-        where: 'LOWER(name) = ?', whereArgs: [name.trim().toLowerCase()], limit: 1);
-    return r.isEmpty ? null : Product.fromMap(r.first);
+    final n = normText(name);
+    if (n.isEmpty) return null;
+    for (final p in await products()) {
+      if (normText(p.name) == n) return p;
+    }
+    return null;
+  }
+
+  /// Artículos que pueden ser el mismo: nombre igual, o uno contiene al otro
+  /// (p. ej. «Leche» y «Leche entera»). Los iguales primero; como mucho 6.
+  Future<List<Product>> similarProducts(String name, {String? exceptId}) async {
+    final n = normText(name);
+    if (n.length < 3) return [];
+    final exact = <Product>[];
+    final close = <Product>[];
+    for (final p in await products()) {
+      if (p.id == exceptId) continue;
+      final pn = normText(p.name);
+      if (pn == n) {
+        exact.add(p);
+      } else if ((pn.contains(n) || n.contains(pn)) && pn.length >= 3) {
+        close.add(p);
+      }
+    }
+    return [...exact, ...close].take(6).toList();
   }
 
   Future<Product> createProduct({
@@ -376,7 +399,7 @@ class Repo extends ChangeNotifier {
     final unit = parseSize(size);
     final p = Product(
       id: newId(),
-      name: name.trim(),
+      name: cleanName(name),
       brand: brand.trim(),
       size: size.trim(),
       section: section ?? guessSection(name),
@@ -410,7 +433,7 @@ class Repo extends ChangeNotifier {
     await db.update(
       'products',
       {
-        'name': p.name.trim(),
+        'name': cleanName(p.name),
         'brand': p.brand.trim(),
         'size': p.size.trim(),
         'section': p.section,

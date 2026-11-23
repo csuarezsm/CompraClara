@@ -142,7 +142,7 @@ Future<Product?> _pickProduct(BuildContext context, String hint) async {
           leading: const Icon(Icons.add),
           title: Text('Crear «$q»'),
           onTap: () async {
-            final p = await repo.createProduct(name: q[0].toUpperCase() + q.substring(1));
+            final p = await repo.productByName(q) ?? await repo.createProduct(name: q);
             if (ctx.mounted) Navigator.pop(ctx, p);
           },
         ),

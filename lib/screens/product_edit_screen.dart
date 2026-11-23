@@ -44,6 +44,11 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   final _notes = TextEditingController();
   String _section = 'Otros';
   bool _filled = false;
+  String _orig = '';
+
+  String get _snapshot => [_name.text.trim(), _brand.text.trim(), _size.text.trim(), _notes.text.trim(), _section].join('|');
+  bool _saved = false;
+  bool get _dirty => _filled && !_saved && _snapshot != _orig;
 
   @override
   void dispose() {
@@ -80,6 +85,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     _size.text = p.size;
     _notes.text = p.notes;
     _section = p.section;
+    _orig = _snapshot;
   }
 
   Future<void> _save(Product p) async {
@@ -88,6 +94,15 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       snack(context, 'El nombre no puede estar vacío');
       return;
     }
+    final same = await repo.productByName(name);
+    if (same != null && same.id != p.id && mounted) {
+      final go = await confirm(context,
+          title: 'Ya existe «${same.name}»',
+          message: 'Hay otro artículo con el mismo nombre${same.detail.isEmpty ? '' : ' (${same.detail})'}. '
+              '¿Guardar igualmente? Pon la marca o el formato para distinguirlos.',
+          okLabel: 'Guardar igualmente');
+      if (!go) return;
+    }
     p
       ..name = name
       ..brand = _brand.text
@@ -95,6 +110,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       ..notes = _notes.text
       ..section = _section;
     await repo.updateProduct(p);
+    _orig = _snapshot;
+    _saved = true;
     if (mounted) {
       snack(context, 'Guardado');
       Navigator.of(context).pop();
@@ -115,7 +132,22 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
           return Scaffold(appBar: AppBar(), body: const Center(child: Text('Artículo no encontrado')));
         }
         _fill(d.product);
-        return Scaffold(
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            if (!_dirty) {
+              Navigator.of(context).pop();
+              return;
+            }
+            final leave = await confirm(context,
+                title: 'Hay cambios sin guardar', message: '¿Salir sin guardarlos?', okLabel: 'Salir sin guardar');
+            if (leave && context.mounted) {
+              _orig = _snapshot;
+              Navigator.of(context).pop();
+            }
+          },
+          child: Scaffold(
           appBar: AppBar(
             title: const Text('Artículo'),
             actions: [
@@ -247,6 +279,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 ),
             ],
           ),
+        ),
         );
       },
     );
