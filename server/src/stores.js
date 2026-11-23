@@ -79,6 +79,17 @@ async function merge(db, fromId, toId) {
   await db.query('UPDATE contributions SET store_id = $2 WHERE store_id = $1', [fromId, toId]);
   await db.query('UPDATE stores SET merged_into = $2 WHERE merged_into = $1', [fromId, toId]);
   await db.query('UPDATE stores SET merged_into = $2, updated_at = now() WHERE id = $1', [fromId, toId]);
+  // Al juntar precios de dos fichas, los pendientes pueden quedar confirmados por otra persona.
+  await db.query(
+    `UPDATE contributions c SET status = 'validated'
+     WHERE c.store_id = $1 AND c.status = 'pending' AND EXISTS (
+       SELECT 1 FROM contributions d
+       WHERE d.store_id = $1 AND d.ean = c.ean AND d.id <> c.id AND d.status <> 'rejected'
+         AND d.contributor_key <> c.contributor_key
+         AND abs(d.price - c.price) <= c.price * 0.05
+         AND d.observed_on BETWEEN c.observed_on - 7 AND c.observed_on + 7)`,
+    [toId],
+  );
 }
 
 /** Posibles duplicados para revisar: avisos de usuarios y pares muy cercanos. */
