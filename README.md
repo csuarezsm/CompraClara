@@ -1,5 +1,7 @@
 # CompraClara
 
+<img src="assets/brand/png/logo-horizontal.png" alt="CompraClara" width="360">
+
 Lista de la compra inteligente por secciones del supermercado. Producto de IT Canarias.
 
 **Versión 0.2 (solo Android):**
@@ -39,3 +41,11 @@ flutter run
 1. **Versión 1 (Android):** hecha en 0.2; queda desplegar el servidor y fijar la clave de firma.
 2. **Versión 2:** compartir listas y compra simultánea en tiempo real.
 3. **Versión 3:** iPhone.
+
+## Marca
+
+- Tema por defecto: Verde `#2E7D5B`.
+- Icono: cesta con marca de verificación, blanca sobre verde. Todo sale de los SVG de `assets/brand/`
+  (icono, primer plano adaptativo, monocromo, arranque, logotipo horizontal y gráfico de Google Play);
+  los PNG están en `assets/brand/png/`. El icono y la pantalla de arranque se generan en cada compilación
+  con `flutter_launcher_icons` y `flutter_native_splash`.

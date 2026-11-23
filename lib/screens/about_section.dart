@@ -20,7 +20,10 @@ class AboutSection extends StatelessWidget {
           Text('Acerca de', style: Theme.of(context).textTheme.titleMedium),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.info_outline),
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset('assets/brand/png/icono-play-512.png', width: 40, height: 40),
+            ),
             title: const Text('CompraClara'),
             subtitle: Text('Versión $v\n© IT Canarias · itcanarias.com · info@itcanarias.com'),
             isThreeLine: true,

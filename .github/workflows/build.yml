@@ -40,6 +40,11 @@ jobs:
       - name: Dependencias
         run: flutter pub get
 
+      - name: Icono y pantalla de arranque
+        run: |
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
+
       - name: Analizar
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 

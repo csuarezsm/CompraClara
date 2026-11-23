@@ -55,12 +55,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    Widget page(IconData icon, String title, String body, List<Widget> extra) => Padding(
+    Widget page(IconData? icon, String title, String body, List<Widget> extra) => Padding(
           padding: const EdgeInsets.all(28),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 72, color: Theme.of(context).colorScheme.primary),
+              icon == null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: Image.asset('assets/brand/png/icono-play-512.png', width: 96, height: 96),
+                    )
+                  : Icon(icon, size: 72, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 20),
               Text(title, style: t.headlineSmall, textAlign: TextAlign.center),
               const SizedBox(height: 12),
@@ -82,7 +87,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       onPageChanged: (i) => setState(() => _i = i),
                       children: [
                         page(
-                          Icons.shopping_basket_outlined,
+                          null,
                           'Bienvenido a CompraClara',
                           'Tu lista de la compra ordenada por las secciones de tu supermercado, '
                               'con tus precios y comparando tiendas cercanas.',

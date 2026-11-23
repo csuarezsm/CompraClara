@@ -1,7 +1,7 @@
 name: compraclara
 description: CompraClara - lista de la compra inteligente por secciones del supermercado.
 publish_to: 'none'
-version: 0.3.0+1
+version: 0.3.1+1
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
@@ -30,6 +30,30 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
+
+# Icono de la app (assets/brand): se genera en la compilación.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/brand/png/icono-1024.png"
+  adaptive_icon_background: "#2E7D5B"
+  adaptive_icon_foreground: "assets/brand/png/icono-primer-plano.png"
+  adaptive_icon_monochrome: "assets/brand/png/icono-monocromo.png"
+  min_sdk_android: 23
+
+# Pantalla de arranque con el logotipo sobre el verde de la marca.
+flutter_native_splash:
+  color: "#2E7D5B"
+  image: "assets/brand/png/arranque.png"
+  android_12:
+    color: "#2E7D5B"
+    image: "assets/brand/png/arranque.png"
+  ios: false
+  web: false
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/png/icono-play-512.png
