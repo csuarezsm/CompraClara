@@ -82,6 +82,7 @@ jobs:
         run: |
           V=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
           echo "name=$V" >> "$GITHUB_OUTPUT"
+          echo "notes=$(git log -1 --pretty=%s | tr -d '\r')" >> "$GITHUB_OUTPUT"
 
       - name: Publicar en Releases
         if: github.event_name == 'push'
@@ -92,5 +93,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: build/CompraClara.apk
           body: |
-            Compilación automática (solo Android).
-            Descarga CompraClara.apk en el móvil e instálala.
+            ${{ steps.ver.outputs.notes }}
+
+            Descarga CompraClara.apk en el móvil e instálala (la app avisa sola de las versiones nuevas).

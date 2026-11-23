@@ -16,7 +16,7 @@ grep -n 'uses-permission\|uses-feature\|android:label' "$MANIFEST"
 
 # Reconocimiento de voz (Android 11+ necesita declararlo)
 if ! grep -q 'android.speech.RecognitionService' "$MANIFEST"; then
-  sed -i 's#</manifest>#    <queries>\n        <intent>\n            <action android:name="android.speech.RecognitionService"/>\n        </intent>\n    </queries>\n</manifest>#' "$MANIFEST"
+  sed -i 's#</manifest>#    <queries>\n        <intent>\n            <action android:name="android.speech.RecognitionService"/>\n        </intent>\n        <intent>\n            <action android:name="android.intent.action.VIEW"/>\n            <data android:scheme="https"/>\n        </intent>\n    </queries>\n</manifest>#' "$MANIFEST"
 fi
 
 # minSdk 23 (requerido por algunos complementos: OCR, voz)

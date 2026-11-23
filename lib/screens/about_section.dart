@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../services/update_service.dart';
 import '../widgets.dart';
 
 const _downloadUrl = 'https://github.com/csuarezsm/CompraClara/releases/latest';
@@ -27,6 +28,13 @@ class AboutSection extends StatelessWidget {
             title: const Text('CompraClara'),
             subtitle: Text('Versión $v\n© IT Canarias · itcanarias.com · info@itcanarias.com'),
             isThreeLine: true,
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.system_update_outlined),
+            title: const Text('Buscar actualizaciones'),
+            subtitle: const Text('La app también lo comprueba sola una vez al día'),
+            onTap: () => UpdateService.checkNow(context),
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,

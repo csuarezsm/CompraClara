@@ -5,6 +5,7 @@ import 'package:quick_actions/quick_actions.dart';
 import 'data/repository.dart';
 import 'screens/catalog_screen.dart';
 import 'services/cloud_service.dart';
+import 'services/update_service.dart';
 import 'theme/appearance.dart';
 import 'screens/lists_screen.dart';
 import 'screens/more_screen.dart';
@@ -76,6 +77,10 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     _setupQuickActions();
     CloudService.autoSync();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = navigatorKey.currentContext;
+      if (ctx != null) UpdateService.checkOnStart(ctx);
+    });
   }
 
   /// Accesos directos al mantener pulsado el icono de la app.
