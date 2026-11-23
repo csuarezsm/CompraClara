@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>CompraClara · Supermercados duplicados</title>
+<style>
+  :root { --acc: #2E7D5B; --bg: #f4f6f5; --card: #fff; --txt: #1b2a23; --mut: #5b6b63; --line: #d9e1dc; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--txt); }
+  header { background: var(--acc); color: #fff; padding: 14px 20px; }
+  main { max-width: 960px; margin: 0 auto; padding: 16px; }
+  .pair { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 12px 0; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .st { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .mut { color: var(--mut); font-size: 14px; }
+  button { font: inherit; border-radius: 8px; border: 1px solid var(--acc); background: #fff; color: var(--acc); padding: 8px 12px; margin: 6px 6px 0 0; cursor: pointer; }
+  button.main { background: var(--acc); color: #fff; }
+  input { font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--line); width: 320px; max-width: 100%; }
+  a { color: var(--acc); }
+  @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header><strong>CompraClara</strong> · supermercados posiblemente duplicados</header>
+<main>
+  <p id="login">
+    <input id="token" type="password" placeholder="Clave de administración (ADMIN_TOKEN)">
+    <button class="main" onclick="start()">Entrar</button>
+  </p>
+  <p id="status" class="mut"></p>
+  <div id="list"></div>
+  <p class="mut">Datos de supermercados © colaboradores de OpenStreetMap.</p>
+</main>
+<script>
+let token = sessionStorage.getItem('cc_admin') || '';
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+async function api(path, body) {
+  const r = await fetch(path, {
+    method: body ? 'POST' : 'GET',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+function card(s) {
+  const map = `https://www.openstreetmap.org/?mlat=${s.lat}&mlon=${s.lng}#map=19/${s.lat}/${s.lng}`;
+  return `<div class="st"><strong>${esc(s.name)}</strong> <span class="mut">#${s.id} · ${esc(s.chain)} · ${s.source === 'osm' ? 'OpenStreetMap' : 'creado por usuario'}</span>
+    <div class="mut">${esc([s.address, s.city].filter(Boolean).join(', ')) || 'Sin dirección'} · ${s.prices} precios · <a href="${map}" target="_blank" rel="noopener">ver en el mapa</a></div></div>`;
+}
+async function load() {
+  document.getElementById('status').textContent = 'Cargando…';
+  try {
+    const { pairs } = await api('/v1/admin/duplicates');
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('status').textContent = pairs.length ? `${pairs.length} posibles duplicados` : 'No hay duplicados pendientes.';
+    document.getElementById('list').innerHTML = pairs.map((p, i) => `
+      <div class="pair">
+        <div class="mut">${p.distance_m} m entre ellos${p.votes ? ` · ${p.votes} aviso(s) de usuarios` : ''}</div>
+        <div class="cols">${card(p.a)}${card(p.b)}</div>
+        <button class="main" onclick="merge(${p.a.id}, ${p.b.id})">Unir en #${p.b.id}</button>
+        <button class="main" onclick="merge(${p.b.id}, ${p.a.id})">Unir en #${p.a.id}</button>
+        <button onclick="distinct(${p.a.id}, ${p.b.id})">Son distintos</button>
+      </div>`).join('');
+  } catch (e) {
+    document.getElementById('status').textContent = 'Error: ' + e.message;
+    document.getElementById('login').style.display = '';
+  }
+}
+async function merge(from, to) {
+  if (!confirm(`¿Unir #${from} en #${to}? Sus precios pasarán a #${to}.`)) return;
+  await api('/v1/admin/merge', { from, to });
+  load();
+}
+async function distinct(a, b) {
+  await api('/v1/admin/not-duplicate', { a, b });
+  load();
+}
+function start() {
+  token = document.getElementById('token').value.trim();
+  sessionStorage.setItem('cc_admin', token);
+  load();
+}
+if (token) load();
+</script>
+</body>
+</html>

@@ -56,3 +56,19 @@ test('agrega con mediana, personas distintas y ofertas caducadas fuera', () => {
   assert.strictEqual(out[0].confirmations, 2);
   assert.strictEqual(out[0].date, '2026-11-20');
 });
+
+test('cadenas: se reconocen por marca o nombre', () => {
+  const { detectChain } = require('../src/chains');
+  assert.strictEqual(detectChain('HiperDino Express'), 'hiperdino');
+  assert.strictEqual(detectChain('', 'Mercadona Arrecife'), 'mercadona');
+  assert.strictEqual(detectChain('Supermercados Dia'), 'dia');
+  assert.strictEqual(detectChain('Diamante bazar'), null);
+  assert.strictEqual(detectChain('Tienda de la esquina'), null);
+});
+
+test('aportación con id global de supermercado', () => {
+  const v = rules.validateContribution(
+    { ean: '8410000000000', price: 1, store: { ...store, global_id: 42, chain: 'mercadona' } }, today);
+  assert.strictEqual(v.store.globalId, 42);
+  assert.strictEqual(v.store.chain, 'mercadona');
+});

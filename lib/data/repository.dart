@@ -34,14 +34,62 @@ class Repo extends ChangeNotifier {
     return r.isEmpty ? null : Store.fromMap(r.first);
   }
 
+  Future<Store?> storeByGlobalId(String globalId) async {
+    final r = await db.query('stores', where: 'global_id = ?', whereArgs: [globalId], limit: 1);
+    return r.isEmpty ? null : Store.fromMap(r.first);
+  }
+
+  /// Enlaza una tienda local con el catálogo común.
+  Future<void> linkStore(String id,
+      {required String globalId, required String chainKey, String address = '', double? lat, double? lng}) async {
+    await db.update(
+        'stores',
+        {
+          'global_id': globalId,
+          'chain_key': chainKey,
+          'address': address,
+          if (lat != null) 'lat': lat,
+          if (lng != null) 'lng': lng,
+        },
+        where: 'id = ?',
+        whereArgs: [id]);
+    _changed();
+  }
+
+  /// Une dos tiendas locales que son la misma: precios, listas, compras y
+  /// recorrido pasan a [toId] y [fromId] se borra.
+  Future<void> mergeLocalStores(String fromId, String toId) async {
+    if (fromId == toId) return;
+    await db.transaction((t) async {
+      await t.update('prices', {'store_id': toId}, where: 'store_id = ?', whereArgs: [fromId]);
+      await t.update('lists', {'store_id': toId}, where: 'store_id = ?', whereArgs: [fromId]);
+      await t.update('purchases', {'store_id': toId}, where: 'store_id = ?', whereArgs: [fromId]);
+      await t.delete('product_store', where: 'store_id = ?', whereArgs: [fromId]);
+      await t.delete('route_log', where: 'store_id = ?', whereArgs: [fromId]);
+      await t.delete('stores', where: 'id = ?', whereArgs: [fromId]);
+    });
+    _changed();
+  }
+
   /// Crea la tienda con la plantilla de secciones.
-  Future<Store> addStore(String name, {String chain = ''}) async {
+  Future<Store> addStore(String name,
+      {String chain = '',
+      String? globalId,
+      String chainKey = '',
+      String address = '',
+      double? lat,
+      double? lng}) async {
     final id = newId();
     await db.transaction((t) async {
       await t.insert('stores', {
         'id': id,
         'name': name,
         'chain': chain,
+        'global_id': globalId,
+        'chain_key': chainKey,
+        'address': address,
+        'lat': lat,
+        'lng': lng,
         'created_at': _now,
       });
       var i = 0;
@@ -56,7 +104,15 @@ class Repo extends ChangeNotifier {
       }
     });
     _changed();
-    return Store(id: id, name: name, chain: chain);
+    return Store(
+        id: id,
+        name: name,
+        chain: chain,
+        globalId: globalId,
+        chainKey: chainKey,
+        address: address,
+        lat: lat,
+        lng: lng);
   }
 
   Future<void> renameStore(String id, String name) async {

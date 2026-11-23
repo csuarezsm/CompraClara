@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../data/demo.dart';
 import '../main.dart' show repo, HomeShell;
+import '../data/models.dart';
 import '../services/location_service.dart';
+import 'store_picker_screen.dart';
 
 /// Primer uso: tienda habitual, zona y primeros artículos (o datos de ejemplo).
 class OnboardingScreen extends StatefulWidget {
@@ -14,7 +16,7 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _page = PageController();
-  final _store = TextEditingController();
+  Store? _picked;
   int _i = 0;
   bool _busy = false;
   bool _locate = true;
@@ -22,7 +24,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   void dispose() {
     _page.dispose();
-    _store.dispose();
     super.dispose();
   }
 
@@ -31,16 +32,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     try {
       if (demo) {
         await loadDemoData(repo);
-      } else if (_store.text.trim().isNotEmpty) {
-        final s = await repo.addStore(_store.text.trim());
-        if (_locate) {
+      } else {
+        if (_locate && await repo.homeZone() == null) {
           final pos = await LocationService.current();
-          if (pos != null) {
-            await repo.setStoreLocation(s.id, pos.lat, pos.lng);
-            if (await repo.homeZone() == null) await repo.setHomeZone(pos.lat, pos.lng);
-          }
+          if (pos != null) await repo.setHomeZone(pos.lat, pos.lng);
         }
-        await repo.createList('Compra semanal', storeId: s.id);
+        if (_picked != null) await repo.createList('Compra semanal', storeId: _picked!.id);
       }
       await repo.setSetting('onboarded', '1');
     } finally {
@@ -104,17 +101,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         page(
                           Icons.storefront_outlined,
                           '¿Cuál es tu supermercado habitual?',
-                          'Se crea con 18 secciones que luego puedes ordenar según el recorrido real.',
+                          'Elígelo de la lista de cercanos. Se crea con 18 secciones que luego puedes ordenar según el recorrido real.',
                           [
-                            TextField(
-                              controller: _store,
-                              onChanged: (_) => setState(() {}),
-                              textCapitalization: TextCapitalization.sentences,
-                              decoration: const InputDecoration(
-                                labelText: 'Supermercado',
-                                hintText: 'Mercadona Arrecife',
-                                border: OutlineInputBorder(),
+                            if (_picked != null)
+                              ListTile(
+                                leading: const Icon(Icons.storefront),
+                                title: Text(_picked!.name),
+                                subtitle: Text(_picked!.address),
                               ),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                final s = await pickStoreFromCatalog(context);
+                                if (s != null) setState(() => _picked = s);
+                              },
+                              icon: const Icon(Icons.near_me_outlined),
+                              label: Text(_picked == null ? 'Buscar supermercados cerca' : 'Cambiar'),
                             ),
                             CheckboxListTile(
                               contentPadding: EdgeInsets.zero,
@@ -126,7 +127,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             const SizedBox(height: 8),
                             FilledButton(
                               onPressed: () => _finish(),
-                              child: Text(_store.text.trim().isEmpty ? 'Saltar' : 'Terminar'),
+                              child: Text(_picked == null ? 'Saltar' : 'Terminar'),
                             ),
                             const SizedBox(height: 8),
                             OutlinedButton.icon(

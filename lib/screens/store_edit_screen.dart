@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../data/models.dart';
 import '../data/repository.dart';
 import '../main.dart' show repo;
+import '../data/chains.dart';
+import '../services/cloud_service.dart';
 import '../services/location_service.dart';
+import 'store_picker_screen.dart';
 import '../util.dart';
 import '../widgets.dart';
 
@@ -40,27 +43,56 @@ class StoreEditScreen extends StatelessWidget {
                     if (n != null) await repo.renameStore(store.id, n);
                   },
                 ),
-                IconButton(
-                  tooltip: 'Eliminar',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () async {
-                    final ok = await confirm(
-                      context,
-                      title: 'Eliminar «${store.name}»',
-                      message: 'Se borrarán sus secciones y los precios guardados en esta tienda.',
-                      okLabel: 'Eliminar',
-                    );
-                    if (ok) {
-                      await repo.deleteStore(store.id);
-                      if (context.mounted) Navigator.of(context).pop();
+                PopupMenuButton<String>(
+                  onSelected: (a) async {
+                    if (a == 'link') {
+                      await Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => StorePickerScreen(linkStoreId: store.id)));
+                    } else if (a == 'same') {
+                      await _reportSameAs(context, store);
+                    } else if (a == 'delete') {
+                      await _delete(context, store);
                     }
                   },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                        value: 'link',
+                        child: Text(store.isLinked ? 'Cambiar súper del catálogo' : 'Enlazar con el catálogo')),
+                    if (store.isLinked)
+                      const PopupMenuItem(value: 'same', child: Text('Avisar: está repetido en el catálogo')),
+                    const PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+                  ],
                 ),
               ],
-              bottom: const TabBar(tabs: [
-                Tab(text: 'Secciones'),
-                Tab(text: 'Artículos'),
-              ]),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(96),
+                child: Column(children: [
+                  if (store.chainKey.isNotEmpty || store.address.isNotEmpty || !store.isLinked)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                      child: Row(children: [
+                        Icon(store.isLinked ? Icons.verified_outlined : Icons.link_off,
+                            size: 16, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            [
+                              if (store.chainKey.isNotEmpty) chainName(store.chainKey),
+                              if (store.address.isNotEmpty) store.address,
+                              if (!store.isLinked) 'sin enlazar al catálogo común',
+                            ].join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ]),
+                    ),
+                  const TabBar(tabs: [
+                    Tab(text: 'Secciones'),
+                    Tab(text: 'Artículos'),
+                  ]),
+                ]),
+              ),
             ),
             body: TabBarView(
               children: [
@@ -72,6 +104,63 @@ class StoreEditScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _delete(BuildContext context, Store store) async {
+    final ok = await confirm(
+      context,
+      title: 'Eliminar «${store.name}»',
+      message: 'Se borrarán sus secciones y los precios guardados en esta tienda.',
+      okLabel: 'Eliminar',
+    );
+    if (ok) {
+      await repo.deleteStore(store.id);
+      if (context.mounted) Navigator.of(context).pop();
+    }
+  }
+
+  /// Avisa de que este súper está repetido en el catálogo común (lo revisa el administrador).
+  Future<void> _reportSameAs(BuildContext context, Store store) async {
+    if (!await CloudService.loggedIn()) {
+      if (context.mounted) snack(context, 'Inicia sesión en Más → Cuenta y nube para avisar');
+      return;
+    }
+    List<CatalogStore> near;
+    try {
+      near = await CloudService.nearbyStores(store.lat!, store.lng!, radiusKm: 0.5);
+    } catch (e) {
+      if (context.mounted) snack(context, '$e');
+      return;
+    }
+    near = near.where((c) => c.id != store.globalId).toList();
+    if (!context.mounted) return;
+    if (near.isEmpty) {
+      snack(context, 'No hay otros supermercados del catálogo a menos de 500 m');
+      return;
+    }
+    final other = await showModalBottomSheet<CatalogStore>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(shrinkWrap: true, children: [
+          const ListTile(title: Text('¿Con cuál está repetido?')),
+          for (final c in near)
+            ListTile(
+              title: Text(c.name),
+              subtitle: Text([chainName(c.chain), if (c.where.isNotEmpty) c.where,
+                if (c.distanceKm != null) kmText(c.distanceKm!)].join(' · ')),
+              onTap: () => Navigator.pop(ctx, c),
+            ),
+        ]),
+      ),
+    );
+    if (other == null) return;
+    try {
+      await CloudService.reportSameAs(store.globalId!, other.id);
+      if (context.mounted) snack(context, 'Gracias: se revisará y se unirán si son el mismo');
+    } catch (e) {
+      if (context.mounted) snack(context, '$e');
+    }
   }
 }
 

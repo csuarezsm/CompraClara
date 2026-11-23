@@ -1,13 +1,32 @@
 class Store {
-  Store({required this.id, required this.name, this.chain = '', this.lat, this.lng});
+  Store({
+    required this.id,
+    required this.name,
+    this.chain = '',
+    this.lat,
+    this.lng,
+    this.globalId,
+    this.chainKey = '',
+    this.address = '',
+  });
 
   final String id;
   final String name;
+
+  /// Origen especial: 'ejemplo' (datos de prueba) o 'comunidad' (añadido al sincronizar).
   final String chain;
   final double? lat;
   final double? lng;
 
+  /// Id del supermercado en el catálogo común (null si solo existe en este móvil).
+  final String? globalId;
+
+  /// Cadena (mercadona, hiperdino…), ver data/chains.dart.
+  final String chainKey;
+  final String address;
+
   bool get hasLocation => lat != null && lng != null;
+  bool get isLinked => globalId != null;
 
   factory Store.fromMap(Map<String, Object?> m) => Store(
         id: m['id'] as String,
@@ -15,6 +34,9 @@ class Store {
         chain: (m['chain'] as String?) ?? '',
         lat: (m['lat'] as num?)?.toDouble(),
         lng: (m['lng'] as num?)?.toDouble(),
+        globalId: m['global_id'] as String?,
+        chainKey: (m['chain_key'] as String?) ?? '',
+        address: (m['address'] as String?) ?? '',
       );
 }
 

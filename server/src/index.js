@@ -10,8 +10,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const rules = require('./rules');
+const stores = require('./stores');
+const { CHAINS } = require('./chains');
 
 const PORT = Number(process.env.PORT || 3000);
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const JWT_SECRET = process.env.JWT_SECRET;
 const CONTRIB_SECRET = process.env.CONTRIB_SECRET;
 if (!JWT_SECRET || JWT_SECRET.length < 32 || !CONTRIB_SECRET || CONTRIB_SECRET.length < 32) {
@@ -120,26 +123,103 @@ app.get('/v1/backup/info', auth, wrap(async (req, res) => {
 
 // ------------------------------------------------------ Precios compartidos
 
-/** Busca un supermercado de la comunidad a menos de 150 m con nombre parecido, o lo crea. */
-async function findOrCreateStore(client, name, lat, lng) {
-  const norm = rules.normName(name);
-  const d = 0.002; // ~200 m
-  const r = await client.query(
-    'SELECT id, name_norm, lat, lng FROM stores WHERE lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4',
-    [lat - d, lat + d, lng - d, lng + d],
-  );
-  let best = null;
-  for (const s of r.rows) {
-    const dist = rules.distanceKm(lat, lng, s.lat, s.lng);
-    if (dist <= 0.15 && rules.similarNames(norm, s.name_norm) && (!best || dist < best.dist)) best = { id: s.id, dist };
+// ------------------------------------------------- Catálogo de supermercados
+
+app.get('/v1/chains', (_req, res) => {
+  res.json({ chains: CHAINS.map(({ key, name }) => ({ key, name })) });
+});
+
+/** Supermercados cerca de un punto (público: no hace falta cuenta). */
+app.get('/v1/stores/nearby', wrap(async (req, res) => {
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  const radius = Math.min(Math.max(Number(req.query.radius_km) || 5, 0.2), 50);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ error: 'Faltan lat y lng' });
+  res.json({ stores: await stores.nearby(pool, lat, lng, radius), attribution: '© colaboradores de OpenStreetMap' });
+}));
+
+app.get('/v1/stores/:id', wrap(async (req, res) => {
+  const id = await stores.resolve(pool, req.params.id);
+  if (id == null) return res.status(404).json({ error: 'No encontrado' });
+  const r = await pool.query('SELECT id, name, chain_key, address, city, lat, lng, source FROM stores WHERE id = $1', [id]);
+  res.json({ store: stores.publicStore(r.rows[0]) });
+}));
+
+/** Alta de un supermercado que no está en el catálogo. Si ya existe (misma cadena a < 100 m), devuelve ese. */
+app.post('/v1/stores', auth, wrap(async (req, res) => {
+  const { name, chain, lat, lng, address } = req.body || {};
+  const la = Number(lat);
+  const ln = Number(lng);
+  if (!name || String(name).trim().length < 2 || !Number.isFinite(la) || !Number.isFinite(ln)) {
+    return res.status(400).json({ error: 'Faltan nombre o ubicación' });
   }
-  if (best) return best.id;
-  const ins = await client.query(
-    'INSERT INTO stores (name, name_norm, lat, lng) VALUES ($1, $2, $3, $4) RETURNING id',
-    [name.trim().slice(0, 120), norm, lat, lng],
+  const chainKey = CHAINS.some((c) => c.key === chain) ? chain : null;
+  const r = await stores.findOrCreate(pool, { name, chain: chainKey, lat: la, lng: ln, address: address || '' });
+  const s = await pool.query('SELECT id, name, chain_key, address, city, lat, lng, source FROM stores WHERE id = $1', [r.id]);
+  res.status(r.created ? 201 : 200).json({ created: r.created, store: stores.publicStore(s.rows[0], la, ln) });
+}));
+
+/** «Este súper es el mismo que…»: queda para revisar en el panel de administración. */
+app.post('/v1/stores/:id/same-as', auth, wrap(async (req, res) => {
+  const a = await stores.resolve(pool, req.params.id);
+  const b = await stores.resolve(pool, req.body && req.body.other_id);
+  if (a == null || b == null || a === b) return res.status(400).json({ error: 'Supermercados no válidos' });
+  await pool.query(
+    'INSERT INTO store_same_as (store_id, other_id, contributor_key) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',
+    [Math.min(a, b), Math.max(a, b), contributorKey(req.userId)],
   );
-  return ins.rows[0].id;
+  res.json({ ok: true });
+}));
+
+// ------------------------------------------------------------ Administración
+
+function admin(req, res, next) {
+  const t = req.headers['x-admin-token'] || '';
+  if (!ADMIN_TOKEN || ADMIN_TOKEN.length < 24 || t.length !== ADMIN_TOKEN.length
+      || !crypto.timingSafeEqual(Buffer.from(t), Buffer.from(ADMIN_TOKEN))) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  next();
 }
+
+app.get('/admin', (_req, res) => {
+  res.setHeader('Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'");
+  res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+app.get('/v1/admin/duplicates', admin, wrap(async (_req, res) => {
+  res.json({ pairs: await stores.duplicateCandidates(pool) });
+}));
+
+/** Fusiona dos supermercados: los precios del primero pasan al segundo. */
+app.post('/v1/admin/merge', admin, wrap(async (req, res) => {
+  const from = await stores.resolve(pool, req.body && req.body.from);
+  const to = await stores.resolve(pool, req.body && req.body.to);
+  if (from == null || to == null || from === to) return res.status(400).json({ error: 'Supermercados no válidos' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await stores.merge(client, from, to);
+    await client.query('DELETE FROM store_same_as WHERE store_id IN ($1,$2) AND other_id IN ($1,$2)', [from, to]);
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+  res.json({ ok: true, merged: from, into: to });
+}));
+
+/** Descarta un posible duplicado (son tiendas distintas). */
+app.post('/v1/admin/not-duplicate', admin, wrap(async (req, res) => {
+  const a = Number(req.body && req.body.a);
+  const b = Number(req.body && req.body.b);
+  await pool.query('DELETE FROM store_same_as WHERE store_id IN ($1,$2) AND other_id IN ($1,$2)', [a, b]);
+  await pool.query('INSERT INTO store_distinct (a, b) VALUES ($1,$2) ON CONFLICT DO NOTHING', [Math.min(a, b), Math.max(a, b)]);
+  res.json({ ok: true });
+}));
 
 /**
  * Recibe precios: [{ean, name, brand, size, store:{name,lat,lng}, price, is_offer, valid_until, date, source}]
@@ -162,7 +242,12 @@ app.post('/v1/prices', auth, wrap(async (req, res) => {
       if (budget <= 0) break;
       const v = rules.validateContribution(it, today);
       if (!v.ok) { rejected++; continue; }
-      const storeId = await findOrCreateStore(client, v.store.name, v.store.lat, v.store.lng);
+      let storeId = v.store.globalId ? await stores.resolve(client, v.store.globalId) : null;
+      if (storeId == null) {
+        storeId = (await stores.findOrCreate(client, {
+          name: v.store.name, chain: v.store.chain, lat: v.store.lat, lng: v.store.lng,
+        })).id;
+      }
       if (v.name) {
         await client.query(
           `INSERT INTO products (ean, name, brand, size) VALUES ($1, $2, $3, $4)
@@ -225,10 +310,10 @@ app.get('/v1/prices', auth, wrap(async (req, res) => {
   const dLng = radius / (111 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
   const r = await pool.query(
     `SELECT c.ean, c.price::float AS price, c.is_offer, c.valid_until, c.observed_on, c.status, c.contributor_key,
-            s.id AS store_id, s.name AS store_name, s.lat, s.lng,
+            s.id AS store_id, s.name AS store_name, s.lat, s.lng, s.chain_key,
             (SELECT COUNT(*)::int FROM reports rp WHERE rp.contribution_id = c.id) AS reports
      FROM contributions c JOIN stores s ON s.id = c.store_id
-     WHERE c.ean = ANY($1) AND c.status = 'validated'
+     WHERE c.ean = ANY($1) AND c.status = 'validated' AND s.merged_into IS NULL
        AND c.observed_on > CURRENT_DATE - 90
        AND s.lat BETWEEN $2 AND $3 AND s.lng BETWEEN $4 AND $5
      ORDER BY c.observed_on DESC`,
@@ -273,6 +358,9 @@ async function start() {
   for (let i = 0; i < 30; i++) {
     try {
       await pool.query(schema);
+      for (const c of CHAINS) {
+        await pool.query('INSERT INTO chains (key, name) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name', [c.key, c.name]);
+      }
       break;
     } catch (e) {
       if (i === 29) throw e;

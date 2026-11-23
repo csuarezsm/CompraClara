@@ -121,6 +121,29 @@ class CloudService {
     return n;
   }
 
+  // -------------------------------------------- Catálogo de supermercados
+
+  /// Supermercados cercanos del catálogo común (no hace falta cuenta).
+  static Future<List<CatalogStore>> nearbyStores(double lat, double lng, {double radiusKm = 5}) async {
+    final j = await _call('GET', '/v1/stores/nearby',
+        query: {'lat': '$lat', 'lng': '$lng', 'radius_km': radiusKm.toStringAsFixed(1)}, auth: false);
+    final list = (j['stores'] as List?) ?? const [];
+    return [for (final s in list) if (s is Map) CatalogStore.fromJson(Map<String, dynamic>.from(s))];
+  }
+
+  /// Da de alta un súper que no está en el catálogo (si ya existe, devuelve ese).
+  static Future<CatalogStore> createStore(
+      {required String name, required String chain, required double lat, required double lng, String address = ''}) async {
+    final j = await _call('POST', '/v1/stores',
+        body: {'name': name, 'chain': chain, 'lat': lat, 'lng': lng, 'address': address});
+    return CatalogStore.fromJson(Map<String, dynamic>.from(j['store'] as Map));
+  }
+
+  /// «Este súper es el mismo que…»
+  static Future<void> reportSameAs(String globalId, String otherGlobalId) async {
+    await _call('POST', '/v1/stores/$globalId/same-as', body: {'other_id': int.tryParse(otherGlobalId)});
+  }
+
   // ---------------------------------------------------- Precios compartidos
 
   /// Envía los precios nuevos de artículos con código de barras en tiendas con ubicación.
@@ -129,7 +152,7 @@ class CloudService {
     final since = int.tryParse(await repo.getSetting('last_push') ?? '') ?? 0;
     final rows = await repo.db.rawQuery('''
       SELECT pr.price, pr.date, pr.is_offer, pr.valid_until, pr.source, pr.created_at,
-             p.name, p.brand, p.size, s.name AS store_name, s.lat, s.lng,
+             p.name, p.brand, p.size, s.name AS store_name, s.lat, s.lng, s.global_id, s.chain_key,
              (SELECT ean FROM barcodes b WHERE b.product_id = p.id LIMIT 1) AS ean
       FROM prices pr
       JOIN products p ON p.id = pr.product_id
@@ -147,7 +170,13 @@ class CloudService {
             'name': r['name'],
             'brand': r['brand'],
             'size': r['size'],
-            'store': {'name': r['store_name'], 'lat': r['lat'], 'lng': r['lng']},
+            'store': {
+              'name': r['store_name'],
+              'lat': r['lat'],
+              'lng': r['lng'],
+              if (r['global_id'] != null) 'global_id': int.tryParse(r['global_id'] as String),
+              if ((r['chain_key'] as String? ?? '').isNotEmpty) 'chain': r['chain_key'],
+            },
             'price': r['price'],
             'is_offer': r['is_offer'] == 1,
             'valid_until': r['valid_until'],
@@ -193,17 +222,28 @@ class CloudService {
       if (pid == null || st is! Map) continue;
       final lat = (st['lat'] as num).toDouble();
       final lng = (st['lng'] as num).toDouble();
+      final gid = '${st['id']}';
       String? storeId;
+      // 1) misma tienda del catálogo; 2) tienda local sin enlazar muy cerca: se enlaza.
       for (final s in stores) {
-        if (s.hasLocation && distanceKm(lat, lng, s.lat!, s.lng!) <= 0.15) {
+        if (s.globalId == gid) {
           storeId = s.id;
           break;
         }
       }
       if (storeId == null) {
-        final s = await repo.addStore(st['name'] as String, chain: 'comunidad');
-        await repo.setStoreLocation(s.id, lat, lng);
-        stores.add((await repo.storeById(s.id))!);
+        for (final s in stores) {
+          if (!s.isLinked && s.hasLocation && distanceKm(lat, lng, s.lat!, s.lng!) <= 0.1) {
+            await repo.linkStore(s.id, globalId: gid, chainKey: (st['chain'] as String?) ?? '');
+            storeId = s.id;
+            break;
+          }
+        }
+      }
+      if (storeId == null) {
+        final s = await repo.addStore(st['name'] as String,
+            chain: 'comunidad', globalId: gid, chainKey: (st['chain'] as String?) ?? '', lat: lat, lng: lng);
+        stores.add(s);
         storeId = s.id;
       }
       final date = e['date'] as String;
@@ -249,4 +289,43 @@ class CloudService {
       // Sin conexión o servidor caído: se reintentará la próxima vez.
     }
   }
+}
+
+/// Supermercado del catálogo común.
+class CatalogStore {
+  CatalogStore({
+    required this.id,
+    required this.name,
+    required this.chain,
+    required this.address,
+    required this.city,
+    required this.lat,
+    required this.lng,
+    required this.fromOsm,
+    this.distanceKm,
+  });
+
+  final String id;
+  final String name;
+  final String chain;
+  final String address;
+  final String city;
+  final double lat;
+  final double lng;
+  final bool fromOsm;
+  final double? distanceKm;
+
+  String get where => [address, city].where((s) => s.trim().isNotEmpty).join(', ');
+
+  factory CatalogStore.fromJson(Map<String, dynamic> j) => CatalogStore(
+        id: '${j['id']}',
+        name: (j['name'] as String?) ?? 'Supermercado',
+        chain: (j['chain'] as String?) ?? 'otro',
+        address: (j['address'] as String?) ?? '',
+        city: (j['city'] as String?) ?? '',
+        lat: (j['lat'] as num).toDouble(),
+        lng: (j['lng'] as num).toDouble(),
+        fromOsm: j['source'] == 'osm',
+        distanceKm: (j['distance_km'] as num?)?.toDouble(),
+      );
 }

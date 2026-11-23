@@ -29,6 +29,21 @@ docker compose -p compraclara ps
 curl -s http://127.0.0.1:8095/v1/health
 ```
 
+### Catálogo de supermercados (una vez y luego cada mes)
+
+```bash
+# Carga los supermercados de Canarias desde OpenStreetMap y fusiona los duplicados creados por usuarios
+docker compose -p compraclara run --rm api node src/import_osm.js
+# Cada mes (crontab -e):
+# 0 4 1 * * cd /opt/compraclara && docker compose -p compraclara run --rm api node src/import_osm.js >> /var/log/compraclara-osm.log 2>&1
+```
+
+### Panel de duplicados
+
+`https://compraclara.itcanarias.com/admin` con la clave `ADMIN_TOKEN` del `.env`: muestra los
+supermercados que pueden estar repetidos (avisos de usuarios y tiendas creadas a menos de ~140 m de otra)
+con botones «Unir» y «Son distintos». Al unir, los precios pasan al supermercado bueno.
+
 ### Proxy inverso (ejemplo nginx)
 
 ```nginx
@@ -66,6 +81,21 @@ docker exec compraclara-db pg_dump -U compraclara compraclara | gzip > /opt/back
 | POST | /v1/prices | Aporta precios (anónimos) |
 | GET | /v1/prices?lat&lng&radius_km&eans | Precios de la comunidad cerca |
 | POST | /v1/prices/report | «Este precio no es correcto» |
+| GET | /v1/chains | Cadenas de supermercados |
+| GET | /v1/stores/nearby?lat&lng&radius_km | Supermercados del catálogo cerca (sin cuenta) |
+| POST | /v1/stores | Alta de un súper que falta (si ya existe, devuelve ese) |
+| POST | /v1/stores/:id/same-as | Avisar de que está repetido |
+| GET / POST | /v1/admin/… | Duplicados, unir y descartar (cabecera `X-Admin-Token`) |
+
+## Supermercados sin duplicados
+
+- Cada supermercado se identifica por **cadena + ubicación** (y su id de OpenStreetMap), no por el nombre.
+- La app muestra los cercanos del catálogo para elegir; escribir a mano es el último recurso y la cadena
+  se elige de una lista.
+- Alta manual: si ya hay uno de la misma cadena a menos de 100 m (o con nombre parecido a menos de 150 m),
+  se devuelve ese en vez de crear otro.
+- La importación mensual de OpenStreetMap fusiona los creados por usuarios que coinciden con uno oficial.
+- El resto se revisa en `/admin`. Datos © colaboradores de OpenStreetMap (ODbL).
 
 ## Reglas de calidad de precios
 

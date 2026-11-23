@@ -8,7 +8,7 @@ class AppDb {
     final path = p.join(await getDatabasesPath(), 'compraclara.db');
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -98,6 +98,7 @@ class AppDb {
         await db.execute('CREATE INDEX idx_prices_ps ON prices(product_id, store_id)');
         await db.execute('CREATE INDEX idx_sections_store ON store_sections(store_id)');
         await _v3(db);
+        await _v4(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -106,6 +107,7 @@ class AppDb {
           await db.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)');
         }
         if (oldVersion < 3) await _v3(db);
+        if (oldVersion < 4) await _v4(db);
       },
     );
   }
@@ -188,5 +190,13 @@ class AppDb {
       )''');
     await db.execute('CREATE INDEX idx_pitems_product ON purchase_items(product_id)');
     await db.execute('CREATE INDEX idx_purchases_date ON purchases(date)');
+  }
+
+  /// Versión 4: supermercados enlazados al catálogo común (id global, cadena y dirección).
+  static Future<void> _v4(Database db) async {
+    await db.execute('ALTER TABLE stores ADD COLUMN global_id TEXT');
+    await db.execute("ALTER TABLE stores ADD COLUMN chain_key TEXT NOT NULL DEFAULT ''");
+    await db.execute("ALTER TABLE stores ADD COLUMN address TEXT NOT NULL DEFAULT ''");
+    await db.execute('CREATE INDEX idx_stores_global ON stores(global_id)');
   }
 }

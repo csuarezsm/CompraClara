@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../data/chains.dart';
 import '../data/models.dart';
 import '../main.dart' show repo;
 import '../widgets.dart';
 import 'settings_screen.dart';
+import 'store_picker_screen.dart';
 import 'store_edit_screen.dart';
 
 /// Mantenimiento de supermercados.
@@ -11,15 +13,11 @@ class StoresScreen extends StatelessWidget {
   const StoresScreen({super.key});
 
   Future<void> _new(BuildContext context) async {
-    final name = await promptText(context,
-        title: 'Nuevo supermercado', hint: 'Mercadona Arrecife', okLabel: 'Crear');
-    if (name == null) return;
-    final s = await repo.addStore(name);
-    if (!context.mounted) return;
+    final s = await pickStoreFromCatalog(context);
+    if (s == null || !context.mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => StoreEditScreen(storeId: s.id)),
     );
-    await showStoreLocationSheet(context, s);
   }
 
   @override
@@ -77,7 +75,12 @@ class StoresScreen extends StatelessWidget {
               return ListTile(
                 leading: const CircleAvatar(child: Icon(Icons.storefront)),
                 title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text(s.hasLocation ? 'Con ubicación' : 'Sin ubicación: no entra en la comparación'),
+                subtitle: Text([
+                  if (s.chainKey.isNotEmpty) chainName(s.chainKey),
+                  if (s.address.isNotEmpty) s.address,
+                  if (!s.hasLocation) 'sin ubicación: no entra en la comparación',
+                  if (s.hasLocation && !s.isLinked) 'sin enlazar al catálogo',
+                ].join(' · ')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => StoreEditScreen(storeId: s.id)),

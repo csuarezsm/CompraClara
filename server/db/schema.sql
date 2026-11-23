@@ -59,3 +59,36 @@ CREATE TABLE IF NOT EXISTS reports (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (contribution_id, contributor_key)
 );
+
+-- ---------------------------------------------------------------- v2: catálogo único
+-- Cadenas (Mercadona, HiperDino…): se eligen de una lista, nunca se escriben.
+CREATE TABLE IF NOT EXISTS chains (
+  key  TEXT PRIMARY KEY,
+  name TEXT NOT NULL
+);
+
+-- Cada supermercado se identifica por cadena + ubicación (y su id de OpenStreetMap si viene de allí).
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS chain_key   TEXT REFERENCES chains(key);
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS osm_id      TEXT;
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS address     TEXT NOT NULL DEFAULT '';
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS city        TEXT NOT NULL DEFAULT '';
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS source      TEXT NOT NULL DEFAULT 'user'; -- osm | user
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS merged_into BIGINT REFERENCES stores(id);
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS updated_at  TIMESTAMPTZ NOT NULL DEFAULT now();
+CREATE UNIQUE INDEX IF NOT EXISTS stores_osm ON stores (osm_id) WHERE osm_id IS NOT NULL;
+
+-- Pares revisados que NO son el mismo súper (no se vuelven a proponer).
+CREATE TABLE IF NOT EXISTS store_distinct (
+  a BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  b BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  PRIMARY KEY (a, b)
+);
+
+-- Avisos de usuarios: «este súper es el mismo que aquel».
+CREATE TABLE IF NOT EXISTS store_same_as (
+  store_id        BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  other_id        BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  contributor_key TEXT NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (store_id, other_id, contributor_key)
+);

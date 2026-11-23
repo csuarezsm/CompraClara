@@ -69,7 +69,13 @@ function validateContribution(it, today) {
     source,
     isOffer: Boolean(it.is_offer),
     validUntil: isDate(it.valid_until) ? it.valid_until : null,
-    store: { name, lat, lng },
+    store: {
+      name,
+      lat,
+      lng,
+      globalId: Number.isInteger(Number(st.global_id)) && Number(st.global_id) > 0 ? Number(st.global_id) : null,
+      chain: typeof st.chain === 'string' ? st.chain.slice(0, 30) : null,
+    },
     name: String(it.name || '').trim().slice(0, 160),
     brand: String(it.brand || '').trim().slice(0, 80),
     size: String(it.size || '').trim().slice(0, 40),
@@ -113,7 +119,7 @@ function aggregate(rows, today) {
     const recent = items.filter((x) => (Date.parse(last) - Date.parse(x.date)) / 86_400_000 <= 30);
     out.push({
       ean: r.ean,
-      store: { id: Number(r.store_id), name: r.store_name, lat: r.lat, lng: r.lng },
+      store: { id: Number(r.store_id), name: r.store_name, lat: r.lat, lng: r.lng, chain: r.chain_key || 'otro' },
       price: Math.round(median(recent.map((x) => x.price)) * 100) / 100,
       date: last,
       offer: items[0].offer,

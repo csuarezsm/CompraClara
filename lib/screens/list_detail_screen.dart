@@ -11,6 +11,7 @@ import 'add_item_screen.dart';
 import 'packs_screen.dart' show addPackDialog;
 import 'settings_screen.dart';
 import 'shop_screen.dart';
+import 'store_picker_screen.dart';
 
 class _DetailData {
   _DetailData({
@@ -630,11 +631,8 @@ Future<Store?> chooseStore(
             leading: const Icon(Icons.add),
             title: const Text('Añadir supermercado'),
             onTap: () async {
-              final name = await promptText(ctx,
-                  title: 'Nuevo supermercado', hint: 'Mercadona Arrecife', okLabel: 'Crear');
-              if (name == null) return;
-              final s = await repo.addStore(name);
-              if (ctx.mounted) Navigator.pop(ctx, s);
+              final s = await pickStoreFromCatalog(ctx);
+              if (s != null && ctx.mounted) Navigator.pop(ctx, s);
             },
           ),
         ],

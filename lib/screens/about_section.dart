@@ -69,6 +69,12 @@ class AboutSection extends StatelessWidget {
               applicationLegalese: '© IT Canarias',
             ),
           ),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.map_outlined),
+            title: Text('Datos de supermercados'),
+            subtitle: Text('© colaboradores de OpenStreetMap (licencia ODbL)'),
+          ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.apps_outlined),
