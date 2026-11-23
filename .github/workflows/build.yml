@@ -74,7 +74,9 @@ jobs:
 
       - name: Versión
         id: ver
-        run: echo "name=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')" >> "$GITHUB_OUTPUT"
+        run: |
+          V=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          echo "name=$V" >> "$GITHUB_OUTPUT"
 
       - name: Publicar en Releases
         if: github.event_name == 'push'
