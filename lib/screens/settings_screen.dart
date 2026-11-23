@@ -6,6 +6,8 @@ import '../services/backup_service.dart';
 import '../services/location_service.dart';
 import '../util.dart';
 import '../widgets.dart';
+import 'about_section.dart';
+import 'appearance_screen.dart';
 
 /// Alérgenos (clave de Open Food Facts -> nombre).
 const allergenNames = {
@@ -99,6 +101,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.palette_outlined),
+                title: const Text('Colores y letra'),
+                subtitle: const Text('Tema de color, claro u oscuro, tamaño de letra y contraste'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const AppearanceScreen())),
+              ),
+              const Divider(height: 32),
               _title('Distancia máxima para comparar'),
               const Text(
                 'Solo se comparan los supermercados a menos de esta distancia de donde estás. '
@@ -266,10 +278,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   }
                 },
               ),
-              const SizedBox(height: 24),
-              Center(
-                child: Text('CompraClara · IT Canarias', style: Theme.of(context).textTheme.bodySmall),
-              ),
+              const Divider(height: 32),
+              const AboutSection(),
             ],
           );
         },

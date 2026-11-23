@@ -5,6 +5,7 @@ import 'package:quick_actions/quick_actions.dart';
 import 'data/repository.dart';
 import 'screens/catalog_screen.dart';
 import 'services/cloud_service.dart';
+import 'theme/appearance.dart';
 import 'screens/lists_screen.dart';
 import 'screens/more_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -15,11 +16,16 @@ import 'screens/ticket_screen.dart';
 /// Acceso global a los datos (todo es local en el móvil).
 late Repo repo;
 
+/// Apariencia (tema, modo, letra) común a las apps de IT Canarias.
+late Appearance appearance;
+
 final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   repo = await Repo.open();
+  appearance = Appearance(repo);
+  await appearance.load();
   final onboarded = await repo.getSetting('onboarded') != null;
   runApp(CompraClaraApp(showOnboarding: !onboarded));
 }
@@ -31,14 +37,17 @@ class CompraClaraApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D5B));
-    final dark = ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D5B), brightness: Brightness.dark);
-    return MaterialApp(
+    return ListenableBuilder(
+      listenable: appearance,
+      builder: (context, _) => MaterialApp(
       title: 'CompraClara',
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorScheme: scheme, useMaterial3: true),
-      darkTheme: ThemeData(colorScheme: dark, useMaterial3: true),
+      theme: appearance.build(Brightness.light),
+      darkTheme: appearance.build(Brightness.dark),
+      themeMode: appearance.effectiveMode,
+      themeAnimationDuration: appearance.reduceMotion ? Duration.zero : const Duration(milliseconds: 200),
+      builder: appearance.wrap,
       locale: const Locale('es'),
       supportedLocales: const [Locale('es')],
       localizationsDelegates: const [
@@ -47,6 +56,7 @@ class CompraClaraApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       home: showOnboarding ? const OnboardingScreen() : const HomeShell(),
+      ),
     );
   }
 }

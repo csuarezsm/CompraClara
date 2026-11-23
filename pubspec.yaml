@@ -1,7 +1,7 @@
 name: compraclara
 description: CompraClara - lista de la compra inteligente por secciones del supermercado.
 publish_to: 'none'
-version: 0.2.0+1
+version: 0.3.0+1
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
@@ -24,6 +24,7 @@ dependencies:
   google_mlkit_text_recognition: ^0.15.0
   quick_actions: ^1.1.0
   barcode_widget: ^2.0.4
+  package_info_plus: ^8.1.0
 
 dev_dependencies:
   flutter_test:
