@@ -72,14 +72,18 @@ jobs:
           name: compraclara-apk
           path: build/CompraClara.apk
 
+      - name: Versión
+        id: ver
+        run: echo "name=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')" >> "$GITHUB_OUTPUT"
+
       - name: Publicar en Releases
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.${{ github.run_number }}
-          name: CompraClara 0.1.${{ github.run_number }}
+          tag_name: v${{ steps.ver.outputs.name }}-${{ github.run_number }}
+          name: CompraClara ${{ steps.ver.outputs.name }} (compilación ${{ github.run_number }})
           target_commitish: ${{ github.sha }}
           files: build/CompraClara.apk
           body: |
-            Compilación automática (MVP interno, solo Android).
+            Compilación automática (solo Android).
             Descarga CompraClara.apk en el móvil e instálala.
